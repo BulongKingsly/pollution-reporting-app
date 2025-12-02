@@ -1,0 +1,51 @@
+/* Toast container positioned top-right */
+.toast-container.top-right {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 2000;
+}
+
+.toast {
+  min-width: 200px;
+}
+
+/* Text size classes */
+:root body.text-small {
+  font-size: 14px;
+}
+
+:root body.text-medium {
+  font-size: 16px;
+}
+
+:root body.text-large {
+  font-size: 18px;
+}
+
+/* Theme classes */
+body.theme-dark {
+  background-color: #1a1a1a;
+  color: #e0e0e0;
+}
+
+body.theme-dark .card {
+  background-color: #2a2a2a;
+  color: #e0e0e0;
+}
+
+body.theme-dark .navbar {
+  background-color: #2a2a2a !important;
+  border-bottom: 1px solid #444;
+}
+
+body.theme-dark .form-control,
+body.theme-dark .form-select {
+  background-color: #333;
+  color: #e0e0e0;
+  border-color: #555;
+}
+
+body.theme-dark .text-muted {
+  color: #aaa !important;
+}

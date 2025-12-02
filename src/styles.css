@@ -1,1 +1,313 @@
-/* You can add global styles to this file, and also import other style files */
+/* Custom Styles for Pollution Report App */
+
+:root {
+    --primary-color: #198754;
+    --secondary-color: #6c757d;
+    --success-color: #28a745;
+    --danger-color: #dc3545;
+    --warning-color: #ffc107;
+    --info-color: #17a2b8;
+}
+
+/* Global Styles */
+body {
+    font-family: 'Inter', 'Open Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    color: #333;
+}
+
+/* Avatar Circles */
+.avatar-circle {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 18px;
+}
+
+/* Upload Area */
+.upload-area {
+    border: 2px dashed #198754;
+    background: #f8f9fa;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.upload-area:hover {
+    background: #e8f5e9;
+    border-color: #28a745;
+}
+
+.upload-area input[type="file"] {
+    opacity: 0;
+    position: absolute;
+    pointer-events: none;
+}
+
+/* Profile Header */
+.profile-header {
+    background: linear-gradient(135deg, #198754 0%, #28a745 100%);
+}
+
+.profile-avatar {
+    width: 100px;
+    height: 100px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 4px solid white;
+}
+
+/* Sidebar for Admin */
+.sidebar {
+    min-height: calc(100vh - 56px);
+    padding: 0;
+}
+
+.sidebar .nav-link {
+    color: #333;
+    padding: 12px 20px;
+    border-left: 3px solid transparent;
+    transition: all 0.2s;
+}
+
+.sidebar .nav-link:hover {
+    background: #f8f9fa;
+    border-left-color: #198754;
+}
+
+.sidebar .nav-link.active {
+    background: #e8f5e9;
+    color: #198754;
+    border-left-color: #198754;
+    font-weight: 600;
+}
+
+/* Cards */
+.card {
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Theme Options */
+.theme-option {
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.theme-option:hover {
+    background: #f8f9fa;
+    border-color: #198754 !important;
+}
+
+.theme-option.active {
+    border-color: #198754 !important;
+    background: #e8f5e9;
+}
+
+/* Buttons */
+.btn {
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.btn-success {
+    background-color: #198754;
+    border-color: #198754;
+}
+
+.btn-success:hover {
+    background-color: #157347;
+    border-color: #146c43;
+}
+
+/* Badges */
+.badge {
+    font-weight: 500;
+    padding: 0.4em 0.8em;
+}
+
+/* Sticky Navbar */
+.sticky-top {
+    position: sticky;
+    top: 0;
+    z-index: 1020;
+}
+
+/* Responsive Images */
+.card-img-top {
+    object-fit: cover;
+    height: 250px;
+}
+
+/* Form Controls */
+.form-control:focus,
+.form-select:focus {
+    border-color: #198754;
+    box-shadow: 0 0 0 0.2rem rgba(25, 135, 84, 0.25);
+}
+
+/* Accordion */
+.accordion-button:not(.collapsed) {
+    background-color: #e8f5e9;
+    color: #198754;
+}
+
+.accordion-button:focus {
+    box-shadow: 0 0 0 0.2rem rgba(25, 135, 84, 0.25);
+}
+
+/* Dark Mode Styles */
+body.dark-mode {
+    background-color: #1a1a1a;
+    color: #e0e0e0;
+}
+
+body.dark-mode .bg-white {
+    background-color: #2d2d2d !important;
+}
+
+body.dark-mode .bg-light {
+    background-color: #333 !important;
+}
+
+body.dark-mode .card {
+    background-color: #2d2d2d;
+    border-color: #404040;
+}
+
+body.dark-mode .text-muted {
+    color: #aaa !important;
+}
+
+body.dark-mode .navbar-light {
+    background-color: #2d2d2d !important;
+}
+
+body.dark-mode .navbar-light .navbar-brand,
+body.dark-mode .navbar-light .nav-link {
+    color: #e0e0e0 !important;
+}
+
+body.dark-mode .form-control,
+body.dark-mode .form-select {
+    background-color: #333;
+    border-color: #404040;
+    color: #e0e0e0;
+}
+
+body.dark-mode .table {
+    color: #e0e0e0;
+}
+
+body.dark-mode .table-light {
+    background-color: #333;
+    color: #e0e0e0;
+}
+
+/* Text Size Classes */
+body.text-small {
+    font-size: 14px;
+}
+
+body.text-medium {
+    font-size: 16px;
+}
+
+body.text-large {
+    font-size: 18px;
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.card {
+    animation: fadeIn 0.3s ease;
+}
+
+/* Mobile Responsive */
+@media (max-width: 768px) {
+    .card-img-top {
+        height: 200px;
+    }
+
+    .profile-avatar {
+        width: 80px;
+        height: 80px;
+    }
+}
+
+/* Print Styles */
+@media print {
+    .navbar,
+    .sidebar,
+    .btn,
+    button {
+        display: none !important;
+    }
+}
+
+@media (max-width: 768px) {
+
+    main {
+        padding: 10px !important;
+    }
+
+    /* Sidebar fix */
+    .sidebar {
+        display: none !important;
+    }
+
+    .mobile-sidebar .nav-link {
+        padding: 12px;
+        border-bottom: 1px solid #eee;
+    }
+
+    /* Make buttons wrap */
+    .btn-group {
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    .btn-group .btn {
+        flex: 1 1 calc(50% - 10px);
+    }
+
+    /* Stack report card content */
+    .card .row {
+        display: block;
+    }
+
+    .card img {
+        width: 100%;
+        margin-bottom: 1rem;
+    }
+
+    /* Table scroll fix */
+    .table {
+        display: block;
+        overflow-x: auto;
+        white-space: nowrap;
+    }
+
+    table {
+        font-size: 14px;
+    }
+}

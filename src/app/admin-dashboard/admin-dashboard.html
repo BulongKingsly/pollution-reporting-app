@@ -1,0 +1,559 @@
+<!-- Navigation -->
+<nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm sticky-top">
+  <div class="container-fluid">
+    <a class="navbar-brand fw-bold text-success" routerLink="/home">
+      <i class="fas fa-leaf me-2"></i>Pollution Report
+    </a>
+
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" title="Toggle navigation menu" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <ul class="navbar-nav ms-auto align-items-center">
+
+        <li class="nav-item"><a class="nav-link" routerLink="/home"><i class="fas fa-home me-1"></i> Home</a></li>
+        <li class="nav-item"><a class="nav-link" routerLink="/help"><i class="fas fa-question-circle me-1"></i> Help</a></li>
+        <li class="nav-item"><a class="nav-link" routerLink="/settings"><i class="fas fa-cog me-1"></i> Settings</a></li>
+        <li class="nav-item" *ngIf="(user$ | async)?.role === 'admin'">
+          <a class="nav-link active" routerLink="/admin"><i class="fas fa-shield-alt me-1"></i> Admin</a>
+        </li>
+        <li class="nav-item ms-lg-3">
+          <a class="btn btn-success" routerLink="/submit-report"><i class="fas fa-plus me-1"></i> New Report</a>
+        </li>
+        <li class="nav-item dropdown ms-lg-2" *ngIf="user$ | async as user">
+          <a class="nav-link dropdown-toggle" data-bs-toggle="dropdown" title="User menu" aria-label="User menu">
+            <i class="fas fa-user-circle fa-lg"></i>
+          </a>
+          <ul class="dropdown-menu dropdown-menu-end">
+            <li><a class="dropdown-item" routerLink="/profile"><i class="fas fa-user me-2"></i>My Profile</a></li>
+            <li><a class="dropdown-item" routerLink="/settings"><i class="fas fa-cog me-2"></i>Settings</a></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item text-danger" (click)="logout()"><i class="fas fa-sign-out-alt me-2"></i>Logout</a></li>
+          </ul>
+        </li>
+
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<!-- Full Admin Dashboard template (Reports / Announcements / Users / Analytics) -->
+<div class="container-fluid">
+  <div class="row">
+      <!-- Toasts container -->
+      <div class="toast-container top-right">
+        <div *ngFor="let t of toasts" class="toast show mb-2 align-items-center text-bg-{{ t.type }}" role="alert">
+          <div class="d-flex">
+            <div class="toast-body">{{ t.message }}</div>
+            <button type="button" class="btn-close btn-close-white me-2 m-auto" aria-label="Close toast" (click)="removeToast(t.id)"></button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Confirm modal (simple) -->
+      <div class="modal" tabindex="-1" [class.show]="confirmVisible" [style.display]="confirmVisible ? 'block' : 'none'">
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title">Confirm</h5>
+              <button type="button" class="btn-close" aria-label="Close dialog" (click)="onConfirmAnswer(false)"></button>
+            </div>
+            <div class="modal-body">
+              <p>{{ confirmMessage }}</p>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" (click)="onConfirmAnswer(false)">Cancel</button>
+              <button type="button" class="btn btn-danger" (click)="onConfirmAnswer(true)">Yes</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    <!-- Sidebar -->
+    <nav class="col-md-3 col-lg-2 d-md-block bg-light sidebar">
+      <div class="position-sticky pt-3">
+        <ul class="nav flex-column">
+          <li class="nav-item">
+            <a class="nav-link" href="#" (click)="$event.preventDefault(); setTab('reports')" [class.active]="activeTab==='reports'">
+              <i class="fas fa-file-alt me-2"></i>Reports Management
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#" (click)="$event.preventDefault(); setTab('announcements')" [class.active]="activeTab==='announcements'">
+              <i class="fas fa-bullhorn me-2"></i>Announcements
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#" (click)="$event.preventDefault(); setTab('users')" [class.active]="activeTab==='users'">
+              <i class="fas fa-users me-2"></i>Users Control
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#" (click)="$event.preventDefault(); setTab('barangays')" [class.active]="activeTab==='barangays'">
+              <i class="fas fa-city me-2"></i>Barangays
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#" (click)="$event.preventDefault(); setTab('analytics')" [class.active]="activeTab==='analytics'">
+              <i class="fas fa-chart-bar me-2"></i>Analytics
+            </a>
+          </li>
+          <li class="nav-item mt-3">
+            <a class="nav-link text-success" href="#" (click)="$event.preventDefault(); goHome()">
+              <i class="fas fa-home me-2"></i>Go to Home
+            </a>
+          </li>
+        </ul>
+      </div>
+    </nav>
+
+    <!-- Main content -->
+    <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+      <br>
+      <!-- Reports -->
+      <section [hidden]="activeTab !== 'reports'">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+          <h2 class="fw-bold">Reports Management</h2>
+          <div class="btn-group">
+            <button class="btn btn-outline-success" (click)="filterStatus='all'" [class.active]="filterStatus==='all'">All</button>
+            <button class="btn btn-outline-warning" (click)="filterStatus='Pending'" [class.active]="filterStatus==='Pending'">Pending</button>
+            <button class="btn btn-outline-primary" (click)="filterStatus='In Progress'" [class.active]="filterStatus==='In Progress'">In Progress</button>
+            <button class="btn btn-outline-secondary" (click)="filterStatus='Done'" [class.active]="filterStatus==='Done'">Done</button>
+          </div>
+        </div>
+
+        <!-- Main admin view: grouped by barangay -->
+        <div *ngIf="isMainAdmin">
+          <div *ngFor="let barangayName of reportBarangayKeys" class="mb-4">
+            <h4 class="fw-semibold mb-3">
+              <i class="fas fa-map-marker-alt me-2"></i>{{ barangayName }}
+              <span class="badge bg-secondary ms-2">{{ reportsByBarangay[barangayName].length }}</span>
+            </h4>
+            <div *ngFor="let r of reportsByBarangay[barangayName]" class="card mb-3">
+              <div class="card-header bg-white">
+                <div class="row align-items-center">
+                  <div class="col-md-8">
+                    <h5 class="mb-0">{{ r.type | titlecase }} - {{ r.location }}</h5>
+                    <small class="text-muted">Reported by {{ r.reporterName }} • {{ r.createdAt | date:'short' }}</small>
+                  </div>
+                  <div class="col-md-4 text-md-end">
+                    <span class="badge" [ngClass]="{
+                      'bg-warning': r.status === 'Pending',
+                      'bg-primary': r.status === 'In Progress',
+                      'bg-success': r.status === 'Done'
+                    }">{{ r.status }}</span>
+                  </div>
+                </div>
+              </div>
+              <div class="card-body">
+                <div class="row">
+                  <div class="col-md-3">
+                    <img [src]="(r.images && r.images.length) ? r.images[0] : 'https://placehold.co/300x200/e8f5e9/2e7d32?text=No+Image'" class="img-fluid rounded" alt="Report">
+                  </div>
+                  <div class="col-md-9">
+                    <p class="mb-3">{{ r.description }}</p>
+
+                    <div class="mb-3">
+                      <label class="form-label fw-medium">Update Status</label>
+                      <select class="form-select" title="Update status" (change)="updateStatus(r, $any($event.target).value)">
+                        <option [value]="'Pending'">Pending</option>
+                        <option [value]="'In Progress'">In Progress</option>
+                        <option [value]="'Done'">Done</option>
+                      </select>
+                    </div>
+
+                    <div class="mb-3">
+                      <label class="form-label fw-medium">Admin Response</label>
+                      <textarea class="form-control" rows="2" [(ngModel)]="responseText[r.id || '']" name="response-{{r.id}}" placeholder="Type your response to the citizen..."></textarea>
+                    </div>
+
+                    <div class="d-flex gap-2">
+                      <button class="btn btn-success" (click)="sendResponse(r, responseText[r.id || ''] || '')">
+                        <i class="fas fa-paper-plane me-1"></i>Send Response
+                      </button>
+                      <button class="btn btn-outline-danger" (click)="deleteReport(r)">
+                        <i class="fas fa-trash me-1"></i>Delete Report
+                      </button>
+                    </div>
+
+                    <div *ngIf="r.adminResponse" class="alert alert-info mt-3">
+                      <strong>Response sent:</strong> {{ r.adminResponse.text }} <small class="text-muted">• {{ r.adminResponse.date }}</small>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Barangay admin view: single list for their barangay -->
+        <div *ngIf="!isMainAdmin">
+          <div *ngIf="reports.length === 0" class="text-muted">No reports yet.</div>
+          <div *ngFor="let r of filteredReports()" class="card mb-3">
+            <div class="card-header bg-white">
+              <div class="row align-items-center">
+                <div class="col-md-8">
+                  <h5 class="mb-0">{{ r.type | titlecase }} - {{ r.location }}</h5>
+                  <small class="text-muted">Reported by {{ r.reporterName }} • {{ r.createdAt | date:'short' }}</small>
+                </div>
+                <div class="col-md-4 text-md-end">
+                  <span class="badge" [ngClass]="{
+                    'bg-warning': r.status === 'Pending',
+                    'bg-primary': r.status === 'In Progress',
+                    'bg-success': r.status === 'Done'
+                  }">{{ r.status }}</span>
+                </div>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="row">
+                <div class="col-md-3">
+                  <img [src]="(r.images && r.images.length) ? r.images[0] : 'https://placehold.co/300x200/e8f5e9/2e7d32?text=No+Image'" class="img-fluid rounded" alt="Report">
+                </div>
+                <div class="col-md-9">
+                  <p class="mb-3">{{ r.description }}</p>
+
+                  <div class="mb-3">
+                    <label class="form-label fw-medium">Update Status</label>
+                    <select class="form-select" title="Update status" (change)="updateStatus(r, $any($event.target).value)">
+                      <option [value]="'Pending'">Pending</option>
+                      <option [value]="'In Progress'">In Progress</option>
+                      <option [value]="'Done'">Done</option>
+                    </select>
+                  </div>
+
+                  <div class="mb-3">
+                    <label class="form-label fw-medium">Admin Response</label>
+                    <textarea class="form-control" rows="2" [(ngModel)]="responseText[r.id || '']" name="response-{{r.id}}" placeholder="Type your response to the citizen..."></textarea>
+                  </div>
+
+                  <div class="d-flex gap-2">
+                    <button class="btn btn-success" (click)="sendResponse(r, responseText[r.id || ''] || '')">
+                      <i class="fas fa-paper-plane me-1"></i>Send Response
+                    </button>
+                    <button class="btn btn-outline-danger" (click)="deleteReport(r)">
+                      <i class="fas fa-trash me-1"></i>Delete Report
+                    </button>
+                  </div>
+
+                  <div *ngIf="r.adminResponse" class="alert alert-info mt-3">
+                    <strong>Response sent:</strong> {{ r.adminResponse.text }} <small class="text-muted">• {{ r.adminResponse.date }}</small>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Announcements -->
+      <section [hidden]="activeTab !== 'announcements'">
+        <h2 class="fw-bold mb-4">Create Announcement</h2>
+        <div class="card mb-4">
+          <div class="card-body">
+            <form (ngSubmit)="postAnnouncement(announcementModel)">
+              <div class="mb-3">
+                <label class="form-label fw-medium">Announcement Title</label>
+                <input class="form-control" [(ngModel)]="announcementModel.title" name="title" required title="Announcement title" placeholder="Title">
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label fw-medium">Subtitle</label>
+                <input class="form-control" [(ngModel)]="announcementModel.subtitle" name="subtitle" title="Subtitle" placeholder="Enter subtitle">
+              </div>
+
+              <!-- Main admin can select target barangay -->
+              <div class="mb-3" *ngIf="isMainAdmin">
+                <label class="form-label fw-medium">Target Barangay</label>
+                <select class="form-select" [(ngModel)]="announcementModel.barangayId" name="barangayId" title="Target barangay">
+                  <option [ngValue]="null">All Barangays (Global)</option>
+                  <option *ngFor="let b of barangays" [ngValue]="b.id">{{ b.name }}</option>
+                </select>
+              </div>
+
+              <!-- Barangay admin sees their barangay (read-only info) -->
+              <div class="mb-3" *ngIf="!isMainAdmin">
+                <div class="alert alert-info">
+                  <i class="fas fa-info-circle me-2"></i>This announcement will be posted to your barangay only.
+                </div>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label fw-medium">Description</label>
+                <textarea class="form-control" rows="5" [(ngModel)]="announcementModel.description" name="description" required title="Description" placeholder="Enter announcement description"></textarea>
+              </div>
+
+              <button class="btn btn-success" type="submit">
+                <i class="fas fa-bullhorn me-1"></i>Post Announcement
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <h4 class="fw-bold mb-3">Recent Announcements</h4>
+
+        <!-- Main admin view: grouped by barangay -->
+        <div *ngIf="isMainAdmin">
+          <div *ngFor="let barangayName of announcementBarangayKeys" class="mb-4">
+            <h5 class="fw-semibold mb-3">
+              <i class="fas fa-{{ barangayName === 'Global' ? 'globe' : 'map-marker-alt' }} me-2"></i>{{ barangayName }}
+              <span class="badge bg-secondary ms-2">{{ announcementsByBarangay[barangayName].length }}</span>
+            </h5>
+            <div *ngFor="let a of announcementsByBarangay[barangayName]" class="card mb-3">
+              <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start">
+                  <div>
+                    <h5 class="fw-semibold">{{ a.title }}</h5>
+                    <p class="mb-1">{{ a.description }}</p>
+                    <small class="text-muted">Posted {{ a.date | date:'short' }} • {{ a.location }}</small>
+                  </div>
+                  <button class="btn btn-sm btn-outline-danger" (click)="deleteAnnouncement(a)" title="Delete announcement">
+                    <i class="fas fa-trash"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Barangay admin view: single list for their barangay -->
+        <div *ngIf="!isMainAdmin">
+          <div *ngIf="announcements.length === 0" class="text-muted">No announcements yet.</div>
+          <div *ngFor="let a of announcements" class="card mb-3">
+            <div class="card-body">
+              <div class="d-flex justify-content-between align-items-start">
+                <div>
+                  <h5 class="fw-semibold">{{ a.title }}</h5>
+                  <p class="mb-1">{{ a.description }}</p>
+                  <small class="text-muted">Posted {{ a.date | date:'short' }} • {{ a.location }}</small>
+                </div>
+                <button class="btn btn-sm btn-outline-danger" (click)="deleteAnnouncement(a)" title="Delete announcement">
+                  <i class="fas fa-trash"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Barangays Management -->
+      <section [hidden]="activeTab !== 'barangays'">
+        <h2 class="fw-bold mb-4">Barangays Management</h2>
+
+        <!-- Main Admin View -->
+        <div *ngIf="isMainAdmin">
+          <div class="card mb-4">
+            <div class="card-body">
+              <div class="row g-2 align-items-center">
+                <div class="col-md-6">
+                  <input class="form-control" #newBarangay placeholder="New barangay name" title="New barangay name">
+                </div>
+                <div class="col-md-6">
+                  <button class="btn btn-success" (click)="createBarangay(newBarangay.value)">Create Barangay</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <h4 class="fw-bold mb-3">Existing Barangays</h4>
+          <div *ngIf="barangays.length === 0" class="text-muted">No barangays yet.</div>
+          <div *ngFor="let b of barangays" class="card mb-3">
+            <div class="card-body">
+              <div class="d-flex justify-content-between align-items-center">
+                <div>
+                  <h5 class="mb-1">{{ b.name }}</h5>
+                  <small class="text-muted">Streets: {{ b.streets.length || 0 }} • Types: {{ b.pollutionTypes.length || 0 }}</small>
+                  <div class="mt-2">
+                    <strong>Admins:</strong>
+                    <ng-container *ngIf="b.adminIds && b.adminIds.length; else noAdmins">
+                      <span *ngFor="let aid of b.adminIds; let i = index">
+                        <span class="badge bg-secondary me-1">{{ getUserEmail(aid) }}</span>
+                        <button class="btn btn-sm btn-link text-danger p-0 ms-1" title="Remove admin" (click)="unassignAdminFromBarangay(b.id || '', aid)">
+                          <i class="fas fa-times"></i>
+                        </button>
+                        <span *ngIf="i < b.adminIds.length - 1">&nbsp;</span>
+                      </span>
+                    </ng-container>
+                    <ng-template #noAdmins><span class="text-muted">No admins</span></ng-template>
+                  </div>
+                </div>
+                <div class="d-flex gap-2 align-items-center">
+                  <select class="form-select" #adminSelect title="Select user to assign as admin">
+                    <option value="">Assign admin</option>
+                    <option *ngFor="let u of assignableUsers" [value]="u.uid">{{ u.email }} {{ u.barangay ? '(' + u.barangay + ')' : '' }}</option>
+                  </select>
+                  <button class="btn btn-primary" (click)="assignAdminToBarangay(b.id || '', adminSelect.value)">Assign</button>
+                  <a class="btn btn-outline-primary" [routerLink]="['/admin/barangay', b.id]" title="Open barangay admin">Open</a>
+                  <button class="btn btn-outline-secondary" (click)="openBarangayAnalytics(b.id || '')" title="Barangay analytics">Analytics</button>
+                  <button class="btn btn-outline-danger" (click)="removeBarangay(b.id || '')">Delete</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Barangay Admin View: Embedded barangay details and analytics -->
+        <div *ngIf="!isMainAdmin && barangays.length > 0">
+          <div *ngFor="let b of barangays" class="mb-4">
+            <!-- Barangay Overview Card -->
+            <div class="card mb-3">
+              <div class="card-header bg-primary text-white">
+                <h4 class="mb-0"><i class="fas fa-map-marker-alt me-2"></i>{{ b.name }}</h4>
+              </div>
+              <div class="card-body">
+                <div class="row">
+                  <div class="col-md-4">
+                    <div class="card bg-light">
+                      <div class="card-body text-center">
+                        <h3 class="fw-bold text-primary">{{ b.streets.length || 0 }}</h3>
+                        <p class="mb-0 text-muted">Streets</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="col-md-4">
+                    <div class="card bg-light">
+                      <div class="card-body text-center">
+                        <h3 class="fw-bold text-success">{{ b.pollutionTypes.length || 0 }}</h3>
+                        <p class="mb-0 text-muted">Pollution Types</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="col-md-4">
+                    <div class="card bg-light">
+                      <div class="card-body text-center">
+                        <h3 class="fw-bold text-info">{{ (b.adminIds && b.adminIds.length) || 0 }}</h3>
+                        <p class="mb-0 text-muted">Admins</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="mt-3">
+                  <a class="btn btn-primary me-2" [routerLink]="['/admin/barangay', b.id]">
+                    <i class="fas fa-edit me-2"></i>Manage Barangay
+                  </a>
+                  <button class="btn btn-outline-secondary" (click)="openBarangayAnalytics(b.id || '')">
+                    <i class="fas fa-chart-bar me-2"></i>View Analytics
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div *ngIf="!isMainAdmin && barangays.length === 0" class="alert alert-info">
+          <i class="fas fa-info-circle me-2"></i>No barangay assigned to your account.
+        </div>
+      </section>
+
+      <!-- Users -->
+      <section [hidden]="activeTab !== 'users'">
+        <h2 class="fw-bold mb-4">Users Management</h2>
+
+        <!-- Main admin view: grouped by barangay -->
+        <div *ngIf="isMainAdmin">
+          <div *ngFor="let barangayName of barangayKeys" class="mb-4">
+            <h4 class="fw-semibold mb-3">
+              <i class="fas fa-map-marker-alt me-2"></i>{{ barangayName }}
+              <span class="badge bg-secondary ms-2">{{ usersByBarangay[barangayName].length }}</span>
+            </h4>
+            <div class="table-responsive">
+              <table class="table table-hover">
+                <thead class="table-light">
+                  <tr>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>Joined</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let u of usersByBarangay[barangayName]">
+                    <td>{{ u.email || 'Unknown' }}</td>
+                    <td>{{ u.email }}</td>
+                    <td><span class="badge" [class.bg-success]="u.role==='admin'">{{ u.role }}</span></td>
+                    <td>{{ u.createdAt | date:'mediumDate' }}</td>
+                    <td>
+                      <button class="btn btn-sm btn-outline-primary me-1" (click)="changeUserRole(u, u.role === 'admin' ? 'user' : 'admin')">Toggle Role</button>
+                      <button class="btn btn-sm btn-outline-danger" (click)="suspendUserAction(u)">Suspend</button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Barangay admin view: single table for their barangay only -->
+        <div *ngIf="!isMainAdmin">
+          <div class="table-responsive">
+            <table class="table table-hover">
+              <thead class="table-light">
+                <tr>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Barangay</th>
+                  <th>Role</th>
+                  <th>Joined</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let u of users">
+                  <td>{{ u.email || 'Unknown' }}</td>
+                  <td>{{ u.email }}</td>
+                  <td>{{ getBarangayName(u.barangay) }}</td>
+                  <td><span class="badge" [class.bg-success]="u.role==='admin'">{{ u.role }}</span></td>
+                  <td>{{ u.createdAt | date:'mediumDate' }}</td>
+                  <td>
+                    <button class="btn btn-sm btn-outline-primary me-1" (click)="changeUserRole(u, u.role === 'admin' ? 'user' : 'admin')">Toggle Role</button>
+                    <button class="btn btn-sm btn-outline-danger" (click)="suspendUserAction(u)">Suspend</button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Analytics -->
+      <section [hidden]="activeTab !== 'analytics'">
+        <h2 class="fw-bold mb-4">Analytics Overview</h2>
+        <div class="row mb-4">
+          <div class="col-md-3">
+            <div class="card bg-primary text-white">
+              <div class="card-body">
+                <h3 class="fw-bold">{{ reports.length }}</h3>
+                <p class="mb-0">Total Reports</p>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="card bg-warning text-white">
+              <div class="card-body">
+                <h3 class="fw-bold">{{ pendingCount }}</h3>
+                <p class="mb-0">Pending</p>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="card bg-info text-white">
+              <div class="card-body">
+                <h3 class="fw-bold">{{ inProgressCount }}</h3>
+                <p class="mb-0">In Progress</p>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="card bg-success text-white">
+              <div class="card-body">
+                <h3 class="fw-bold">{{ doneCount }}</h3>
+                <p class="mb-0">Resolved</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+</div>

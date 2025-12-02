@@ -1,0 +1,187 @@
+<!-- Navigation -->
+<nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm sticky-top">
+  <div class="container-fluid">
+    <a class="navbar-brand fw-bold text-success" routerLink="/home">
+      <i class="fas fa-leaf me-2"></i>Pollution Report
+    </a>
+
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" title="Toggle navigation menu" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <ul class="navbar-nav ms-auto align-items-center">
+
+        <li class="nav-item"><a class="nav-link" routerLink="/home"><i class="fas fa-home me-1"></i> Home</a></li>
+        <li class="nav-item"><a class="nav-link" routerLink="/help"><i class="fas fa-question-circle me-1"></i> Help</a></li>
+        <li class="nav-item"><a class="nav-link" routerLink="/settings"><i class="fas fa-cog me-1"></i> Settings</a></li>
+        <li class="nav-item" *ngIf="(user$ | async)?.role === 'admin'">
+          <a class="nav-link" routerLink="/admin"><i class="fas fa-shield-alt me-1"></i> Admin</a>
+        </li>
+        <li class="nav-item ms-lg-3">
+          <a class="btn btn-success" routerLink="/submit-report"><i class="fas fa-plus me-1"></i> New Report</a>
+        </li>
+        <li class="nav-item dropdown ms-lg-2" *ngIf="user$ | async as user">
+          <a class="nav-link dropdown-toggle" data-bs-toggle="dropdown">
+            <i class="fas fa-user-circle fa-lg"></i>
+          </a>
+          <ul class="dropdown-menu dropdown-menu-end">
+            <li><a class="dropdown-item" routerLink="/profile"><i class="fas fa-user me-2"></i>My Profile</a></li>
+            <li><a class="dropdown-item" routerLink="/settings"><i class="fas fa-cog me-2"></i>Settings</a></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item text-danger" (click)="logout()"><i class="fas fa-sign-out-alt me-2"></i>Logout</a></li>
+          </ul>
+        </li>
+
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<!-- Main Content -->
+<div class="container mt-4">
+  <div class="row">
+
+    <!-- Search + Filters -->
+    <div class="col-12 mb-4">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body">
+          <div class="row g-3 align-items-end">
+
+            <div class="col-md-6">
+              <label class="form-label fw-medium">Search Reports</label>
+              <div class="input-group">
+                <input type="text" class="form-control" placeholder="Search by location or description..." [(ngModel)]="searchTerm">
+                <button class="btn btn-success" (click)="onSearch()" title="Search reports">
+                  <i class="fas fa-search"></i>
+                </button>
+              </div>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label fw-medium">Filter By</label>
+              <div class="btn-group w-100" role="group">
+                <button class="btn btn-outline-success" [class.active]="selectedFilter==='Latest'" (click)="selectedFilter='Latest'">Latest</button>
+                <button class="btn btn-outline-success" [class.active]="selectedFilter==='Yesterday'" (click)="selectedFilter='Yesterday'">Yesterday</button>
+                <button class="btn btn-outline-success" [class.active]="selectedFilter==='Select Date'" (click)="selectedFilter='Select Date'">Select Date</button>
+                <button class="btn btn-outline-success" [class.active]="selectedFilter==='Trending'" (click)="selectedFilter='Trending'">Trending</button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Barangay Metrics -->
+    <div class="col-12 mb-4" *ngIf="(user$ | async)?.barangay">
+      <div class="row g-3">
+        <div class="col-md-4">
+          <div class="card border-0 shadow-sm text-center">
+            <div class="card-body">
+              <i class="fas fa-file-alt text-primary fa-2x mb-2"></i>
+              <h3 class="fw-bold mb-0">{{ totalReports$ | async }}</h3>
+              <p class="text-muted mb-0 small">Total Reports</p>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="card border-0 shadow-sm text-center">
+            <div class="card-body">
+              <i class="fas fa-clock text-warning fa-2x mb-2"></i>
+              <h3 class="fw-bold mb-0">{{ pendingReports$ | async }}</h3>
+              <p class="text-muted mb-0 small">Pending</p>
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="card border-0 shadow-sm text-center">
+            <div class="card-body">
+              <i class="fas fa-check-circle text-success fa-2x mb-2"></i>
+              <h3 class="fw-bold mb-0">{{ resolvedReports$ | async }}</h3>
+              <p class="text-muted mb-0 small">Resolved</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Feed -->
+    <div class="col-lg-8 mx-auto">
+
+      <!-- Announcements from Firestore -->
+      <ng-container *ngIf="announcements$ | async as announcements">
+        <div *ngIf="announcements.length > 0" class="card border-0 shadow-sm mb-4 border-start border-4 border-info">
+          <div class="card-body d-flex align-items-start">
+            <i class="fas fa-bullhorn text-info fa-2x me-3"></i>
+            <div>
+              <h5 class="card-title fw-bold mb-2"><i class="fas fa-star text-warning me-1"></i> {{ announcements[0].title }}</h5>
+              <h6 class="fw-semibold">{{ announcements[0].subtitle }}</h6>
+              <p class="card-text text-muted mb-2">{{ announcements[0].description }}</p>
+              <small class="text-muted">Posted {{ announcements[0].createdAt | date:'short' }} • {{ announcements[0].location }}</small>
+            </div>
+          </div>
+        </div>
+      </ng-container>
+
+      <!-- Firestore Reports -->
+      <ng-container *ngIf="reports$ | async as reports; else noReports">
+        <div *ngFor="let report of filterReports(reports)" class="card border-0 shadow-sm mb-4">
+          <div class="card-body">
+
+            <div class="d-flex align-items-center mb-3">
+              <div class="avatar-circle bg-success text-white me-2">
+                {{ getInitials(report.reporterName) }}
+              </div>
+              <div class="flex-grow-1">
+                <h6 class="mb-0 fw-semibold">{{ report.reporterName }}</h6>
+                <small class="text-muted">{{ report.location }} • {{ report.createdAt | date:'short' }}</small>
+              </div>
+              <span class="badge bg-danger">{{ report.type | titlecase }}</span>
+            </div>
+
+            <img *ngIf="report.images && report.images.length" [src]="report.images[0]" class="card-img-top rounded mb-3" alt="{{report.type}} report image" title="Report image">
+
+            <p class="card-text">{{ report.description }}</p>
+
+            <div class="mb-3">
+              <small class="text-muted">
+                <i class="fas fa-map-marker-alt me-1"></i>{{ report.location }}
+              </small>
+              <small class="text-muted ms-3">
+                <i class="fas fa-calendar me-1"></i>{{ report.date }} {{ report.time }}
+              </small>
+            </div>
+
+            <div class="d-flex align-items-center gap-3 border-top pt-3">
+              <button class="btn btn-sm btn-outline-success" (click)="upvote(report)">
+                <i class="fas fa-arrow-up me-1"></i>{{ report.upvotes }} Upvotes
+              </button>
+              <span class="text-muted small"><i class="fas fa-comment me-1"></i>0 Comments</span>
+              <span class="badge bg-warning text-dark ms-auto">{{ report.status }}</span>
+            </div>
+
+            <!-- Admin Response -->
+            <div *ngIf="report.adminResponse" class="mt-3 p-3 bg-light rounded">
+              <div class="d-flex align-items-start">
+                <i class="fas fa-user-shield text-primary me-2"></i>
+                <div>
+                  <h6 class="mb-1 fw-semibold text-primary">Barangay Admin Response</h6>
+                  <p class="mb-1 small">{{ report.adminResponse.text }}</p>
+                  <small class="text-muted">Responded {{ report.adminResponse.date }}</small>
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </ng-container>
+
+      <ng-template #noReports>
+        <p class="text-center text-muted">No reports found.</p>
+      </ng-template>
+
+    </div>
+
+  </div>
+</div>

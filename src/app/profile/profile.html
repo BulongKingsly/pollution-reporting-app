@@ -1,0 +1,70 @@
+<!-- Navigation -->
+<nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm sticky-top">
+  <div class="container-fluid">
+    <a class="navbar-brand fw-bold text-success" routerLink="/home">
+      <i class="fas fa-leaf me-2"></i>Pollution Report
+    </a>
+
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" title="Toggle navigation menu" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <ul class="navbar-nav ms-auto align-items-center">
+
+        <li class="nav-item"><a class="nav-link" routerLink="/home"><i class="fas fa-home me-1"></i> Home</a></li>
+        <li class="nav-item"><a class="nav-link" routerLink="/help"><i class="fas fa-question-circle me-1"></i> Help</a></li>
+        <li class="nav-item"><a class="nav-link" routerLink="/settings"><i class="fas fa-cog me-1"></i> Settings</a></li>
+        <li class="nav-item" *ngIf="(user$ | async)?.role === 'admin'">
+          <a class="nav-link" routerLink="/admin"><i class="fas fa-shield-alt me-1"></i> Admin</a>
+        </li>
+        <li class="nav-item ms-lg-3">
+          <a class="btn btn-success" routerLink="/submit-report"><i class="fas fa-plus me-1"></i> New Report</a>
+        </li>
+        <li class="nav-item dropdown ms-lg-2" *ngIf="user$ | async as user">
+          <a class="nav-link dropdown-toggle" data-bs-toggle="dropdown" title="User menu" aria-label="User menu">
+            <i class="fas fa-user-circle fa-lg"></i>
+          </a>
+          <ul class="dropdown-menu dropdown-menu-end">
+            <li><a class="dropdown-item" routerLink="/profile"><i class="fas fa-user me-2"></i>My Profile</a></li>
+            <li><a class="dropdown-item" routerLink="/settings"><i class="fas fa-cog me-2"></i>Settings</a></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item text-danger" (click)="logout()"><i class="fas fa-sign-out-alt me-2"></i>Logout</a></li>
+          </ul>
+        </li>
+
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<div *ngIf="user$ | async as user" class="container mt-4">
+  <div class="row justify-content-center">
+    <div class="col-md-8">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <div class="d-flex align-items-center mb-3">
+            <div class="avatar-circle bg-success text-white me-3">{{ (user.email || 'U').charAt(0) }}</div>
+            <div>
+              <h4 class="mb-0">{{ user.email }}</h4>
+              <small class="text-muted">Joined: {{ user.createdAt | date:'mediumDate' }}</small>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <strong>Role:</strong> <span class="badge bg-secondary ms-2">{{ user.role }}</span>
+          </div>
+
+          <div class="mb-3">
+            <strong>Barangay:</strong> <span class="ms-2">{{ barangayName$ | async }}</span>
+          </div>
+
+          <div class="d-flex gap-2 mt-3">
+            <a class="btn btn-primary" routerLink="/settings">Edit Settings</a>
+            <a class="btn btn-outline-secondary" routerLink="/home">Back to Home</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
