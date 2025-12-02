@@ -8,7 +8,7 @@ export interface AppUserDoc {
   name?: string;
   email?: string | null;
   barangay?: string;
-  role?: 'user' | 'barangay-admin' | 'main-admin';
+  role?: 'user' | 'admin';
   createdAt?: any;
 }
 

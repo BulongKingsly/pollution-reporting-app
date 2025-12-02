@@ -11,10 +11,7 @@
 
     <div class="collapse navbar-collapse" id="navbarNav">
       <ul class="navbar-nav ms-auto align-items-center">
-
-        <li class="nav-item"><a class="nav-link" routerLink="/home"><i class="fas fa-home me-1"></i> Home</a></li>
-        <li class="nav-item"><a class="nav-link" routerLink="/help"><i class="fas fa-question-circle me-1"></i> Help</a></li>
-        <li class="nav-item"><a class="nav-link active" routerLink="/settings"><i class="fas fa-cog me-1"></i> Settings</a></li>
+        <li class="nav-item"><a class="nav-link" routerLink="/home"><i class="fas fa-home me-1"></i> Home</a></li>@if ((user$ | async)?.role !== 'admin') {<li class="nav-item"><a class="nav-link" routerLink="/help"><i class="fas fa-question-circle me-1"></i> Help</a></li>}<li class="nav-item"><a class="nav-link active" routerLink="/settings"><i class="fas fa-cog me-1"></i> Settings</a></li>
         <li class="nav-item" *ngIf="(user$ | async)?.role === 'admin'">
           <a class="nav-link" routerLink="/admin"><i class="fas fa-shield-alt me-1"></i> Admin</a>
         </li>
@@ -22,8 +19,18 @@
           <a class="btn btn-success" routerLink="/submit-report"><i class="fas fa-plus me-1"></i> New Report</a>
         </li>
         <li class="nav-item dropdown ms-lg-2" *ngIf="user$ | async as user">
-          <a class="nav-link dropdown-toggle" data-bs-toggle="dropdown" title="User menu" aria-label="User menu">
-            <i class="fas fa-user-circle fa-lg"></i>
+          <a class="nav-link dropdown-toggle d-flex align-items-center" data-bs-toggle="dropdown" title="User menu" aria-label="User menu">
+            <img *ngIf="user.profilePictureUrl; else userIcon"
+                 [src]="user.profilePictureUrl"
+                 alt="Profile"
+                 class="rounded-circle"
+                 style="width: 32px; height: 32px; object-fit: cover; border: 2px solid #198754;">
+            <ng-template #userIcon>
+              <div class="rounded-circle bg-success text-white d-flex align-items-center justify-content-center"
+                   style="width: 32px; height: 32px; font-size: 0.9rem;">
+                {{ (user.username || user.fullName || user.email || 'U').charAt(0).toUpperCase() }}
+              </div>
+            </ng-template>
           </a>
           <ul class="dropdown-menu dropdown-menu-end">
             <li><a class="dropdown-item" routerLink="/profile"><i class="fas fa-user me-2"></i>My Profile</a></li>
@@ -246,3 +253,31 @@
     </div>
   </div>
 </div>
+
+<!-- Mobile Bottom Navigation (visible only on mobile) -->
+<nav class="mobile-bottom-nav d-md-none">
+  <a routerLink="/home" class="mobile-nav-item" routerLinkActive="active">
+    <i class="fas fa-home"></i>
+    <span>Home</span>
+  </a>
+  <a routerLink="/submit-report" class="mobile-nav-item">
+    <i class="fas fa-plus-circle"></i>
+    <span>Report</span>
+  </a>
+  @if ((user$ | async)?.role !== 'admin') {
+    <a routerLink="/help" class="mobile-nav-item" routerLinkActive="active">
+      <i class="fas fa-question-circle"></i>
+      <span>Help</span>
+    </a>
+  }
+  @if ((user$ | async)?.role === 'admin') {
+    <a routerLink="/admin" class="mobile-nav-item" routerLinkActive="active">
+      <i class="fas fa-shield-alt"></i>
+      <span>Admin</span>
+    </a>
+  }
+  <a routerLink="/profile" class="mobile-nav-item" routerLinkActive="active">
+    <i class="fas fa-user"></i>
+    <span>Account</span>
+  </a>
+</nav>

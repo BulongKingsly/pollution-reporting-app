@@ -11,30 +11,39 @@
     </button>
 
     <div class="collapse navbar-collapse" id="navbarNav">
-      <ul class="navbar-nav ms-auto">
-
+      <ul class="navbar-nav ms-auto align-items-center">
         <li class="nav-item">
           <a class="nav-link" routerLink="/home">
             <i class="fas fa-home me-1"></i> Home
           </a>
-        </li>
-
-        <li class="nav-item">
+        </li>@if ((user$ | async)?.role !== 'admin') {<li class="nav-item">
           <a class="nav-link active">
             <i class="fas fa-question-circle me-1"></i> Help
           </a>
+        </li>}<li class="nav-item ms-lg-3">
+          <a class="btn btn-success" routerLink="/submit-report"><i class="fas fa-plus me-1"></i> New Report</a>
         </li>
 
-        <li class="nav-item dropdown">
-          <a class="nav-link dropdown-toggle" role="button" data-bs-toggle="dropdown" title="User menu" aria-label="User menu">
-            <i class="fas fa-user-circle fa-lg"></i>
+        <li class="nav-item dropdown ms-lg-2" *ngIf="user$ | async as user">
+          <a class="nav-link dropdown-toggle d-flex align-items-center" role="button" data-bs-toggle="dropdown" title="User menu" aria-label="User menu">
+            <img *ngIf="user.profilePictureUrl; else userIcon"
+                 [src]="user.profilePictureUrl"
+                 alt="Profile"
+                 class="rounded-circle"
+                 style="width: 32px; height: 32px; object-fit: cover; border: 2px solid #198754;">
+            <ng-template #userIcon>
+              <div class="rounded-circle bg-success text-white d-flex align-items-center justify-content-center"
+                   style="width: 32px; height: 32px; font-size: 0.9rem;">
+                {{ (user.username || user.fullName || user.email || 'U').charAt(0).toUpperCase() }}
+              </div>
+            </ng-template>
           </a>
 
           <ul class="dropdown-menu dropdown-menu-end">
-            <li><a class="dropdown-item" routerLink="/profile">My Profile</a></li>
-            <li><a class="dropdown-item" routerLink="/settings">Settings</a></li>
+            <li><a class="dropdown-item" routerLink="/profile"><i class="fas fa-user me-2"></i>My Profile</a></li>
+            <li><a class="dropdown-item" routerLink="/settings"><i class="fas fa-cog me-2"></i>Settings</a></li>
             <li><hr class="dropdown-divider"></li>
-            <li><a class="dropdown-item text-danger" (click)="logout()">Logout</a></li>
+            <li><a class="dropdown-item text-danger" (click)="logout()"><i class="fas fa-sign-out-alt me-2"></i>Logout</a></li>
           </ul>
         </li>
       </ul>
@@ -205,14 +214,17 @@
           <h4 class="fw-bold">Still need help?</h4>
           <p class="text-muted">Contact your barangay office for additional support</p>
 
-          <div class="d-flex justify-content-center gap-3">
+          <div class="d-flex flex-column align-items-center gap-2">
+            <div>
+              <strong class="text-success">{{ barangayName$ | async }}</strong>
+            </div>
             <div>
               <i class="fas fa-phone text-success me-1"></i>
-              <strong>(02) 1234-5678</strong>
+              <strong>{{ barangayAdminContact$ | async }}</strong>
             </div>
             <div>
               <i class="fas fa-envelope text-success me-1"></i>
-              <strong>barangay@sanmiguel.gov.ph</strong>
+              <strong>{{ barangayAdminEmail$ | async }}</strong>
             </div>
           </div>
         </div>
@@ -221,3 +233,23 @@
     </div>
   </div>
 </div>
+
+<!-- Mobile Bottom Navigation (visible only on mobile) -->
+<nav class="mobile-bottom-nav d-md-none">
+  <a routerLink="/home" class="mobile-nav-item" routerLinkActive="active">
+    <i class="fas fa-home"></i>
+    <span>Home</span>
+  </a>
+  <a routerLink="/submit-report" class="mobile-nav-item">
+    <i class="fas fa-plus-circle"></i>
+    <span>Report</span>
+  </a>
+  <a routerLink="/help" class="mobile-nav-item active">
+    <i class="fas fa-question-circle"></i>
+    <span>Help</span>
+  </a>
+  <a routerLink="/profile" class="mobile-nav-item" routerLinkActive="active">
+    <i class="fas fa-user"></i>
+    <span>Account</span>
+  </a>
+</nav>

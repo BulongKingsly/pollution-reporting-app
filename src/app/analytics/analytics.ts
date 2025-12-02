@@ -1,25 +1,31 @@
 import { Component, OnInit, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Router } from '@angular/router';
+import { FormsModule } from '@angular/forms';
+import { Router, ActivatedRoute } from '@angular/router';
 import { ReportsService } from '../services/reports';
+import { BarangaysService } from '../services/barangays.service';
 import { AuthService } from '../services/auth-guard';
 import { Observable, combineLatest } from 'rxjs';
 import { map } from 'rxjs/operators';
 import { ChartConfiguration, ChartData, ChartOptions } from 'chart.js';
 import Chart from 'chart.js/auto';
+
 @Component({
   selector: 'app-analytics',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, FormsModule],
   templateUrl: './analytics.html',
   styleUrls: ['./analytics.css']
 })
 export class AnalyticsComponent implements OnInit {
   isMainAdmin = false;
   barangayId: string | null = null;
+  selectedBarangay = '';
+  barangays$!: Observable<any[]>;
 
   totalReports = 0;
-  countsByType: Record<string, number> = { water: 0, air: 0, land: 0 };
+  countsByType: Record<string, number> = {};
+  pollutionTypes: string[] = [];
   last7Days: { label: string; count: number }[] = [];
 
   @ViewChild('barCanvas', { static: false }) barCanvas!: ElementRef<HTMLCanvasElement>;
@@ -30,23 +36,46 @@ export class AnalyticsComponent implements OnInit {
 
   constructor(
     private reportsService: ReportsService,
+    private barangaysService: BarangaysService,
     private auth: AuthService,
-    private router: Router
+    private router: Router,
+    private route: ActivatedRoute
   ) {}
 
   ngOnInit(): void {
-    this.auth.user$.pipe(
-      map(u => {
-        this.isMainAdmin = !!u && u.role === 'admin' && (!u.barangay || u.barangay === '');
-        this.barangayId = u?.barangay || null;
-        return u;
-      })
-    ).subscribe(u => {
-      // choose reports stream based on role
-      const reports$ = this.isMainAdmin ? this.reportsService.getAllReports() : (this.barangayId ? this.reportsService.getReportsByBarangay(this.barangayId) : this.reportsService.getAllReports());
+    // Initialize barangays observable
+    this.barangays$ = this.barangaysService.getAllBarangays();
 
-      reports$.pipe(map(list => list || [])).subscribe(list => this.calculateMetrics(list));
+    // Check if we're viewing a specific barangay from route
+    this.route.params.subscribe(params => {
+      const routeBarangayId = params['barangayId'];
+
+      this.auth.user$.pipe(
+        map(u => {
+          this.isMainAdmin = !!u && u.role === 'admin' && (!u.barangay || u.barangay === '');
+          this.barangayId = routeBarangayId || u?.barangay || null;
+          this.selectedBarangay = this.barangayId || '';
+          return u;
+        })
+      ).subscribe(() => {
+        this.loadAnalytics();
+      });
     });
+  }
+
+  onBarangayChange(): void {
+    this.barangayId = this.selectedBarangay || null;
+    this.loadAnalytics();
+  }
+
+  loadAnalytics(): void {
+    const reports$ = this.isMainAdmin && !this.barangayId
+      ? this.reportsService.getAllReports()
+      : this.barangayId
+      ? this.reportsService.getReportsByBarangay(this.barangayId)
+      : this.reportsService.getAllReports();
+
+    reports$.pipe(map(list => list || [])).subscribe(list => this.calculateMetrics(list));
   }
 
   goBack(): void {
@@ -55,8 +84,21 @@ export class AnalyticsComponent implements OnInit {
 
   private calculateMetrics(list: any[]) {
     this.totalReports = list.length;
-    // reset counts
-    this.countsByType = { water: 0, air: 0, land: 0 } as any;
+
+    // Extract unique pollution types from reports
+    const typeSet = new Set<string>();
+    list.forEach(r => {
+      const t = (r.type || r.pollutionType || '').toLowerCase();
+      if (t) typeSet.add(t);
+    });
+
+    this.pollutionTypes = Array.from(typeSet).sort();
+
+    // Initialize counts for all types
+    this.countsByType = {};
+    this.pollutionTypes.forEach(type => {
+      this.countsByType[type] = 0;
+    });
 
     const byDay: Record<string, number> = {};
     const today = new Date();
@@ -105,17 +147,20 @@ export class AnalyticsComponent implements OnInit {
           this.barChart.update();
         }
 
-        const orderedTypes = ['water', 'air', 'land'];
-        const pieData = orderedTypes.map(t => this.countsByType[t] || 0);
+        const pieLabels = this.pollutionTypes.map(t => t.charAt(0).toUpperCase() + t.slice(1));
+        const pieData = this.pollutionTypes.map(t => this.countsByType[t] || 0);
+        const colors = ['#198754', '#0dcaf0', '#ffc107', '#dc3545', '#6610f2', '#fd7e14'];
 
         if (!this.pieChart && this.pieCanvas) {
           this.pieChart = new Chart(this.pieCanvas.nativeElement.getContext('2d')!, {
             type: 'pie',
-            data: { labels: ['Water', 'Air', 'Land'], datasets: [{ data: pieData, backgroundColor: ['#198754', '#0dcaf0', '#ffc107'] }] },
+            data: { labels: pieLabels, datasets: [{ data: pieData, backgroundColor: colors.slice(0, pieLabels.length) }] },
             options: { responsive: true }
           });
         } else if (this.pieChart) {
+          this.pieChart.data.labels = pieLabels;
           this.pieChart.data.datasets[0].data = pieData;
+          this.pieChart.data.datasets[0].backgroundColor = colors.slice(0, pieLabels.length);
           this.pieChart.update();
         }
       } catch (e) {

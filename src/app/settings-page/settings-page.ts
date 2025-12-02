@@ -7,6 +7,7 @@ import { take } from 'rxjs/operators';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { RouterLink, Router } from '@angular/router';
+import { TranslationService } from '../services/translation.service';
 
 @Component({
   selector: 'app-settings',
@@ -43,7 +44,8 @@ export class SettingsPage implements OnInit {
     private authService: AuthService,
     private firebaseAuth: Auth,
     private firestore: Firestore,
-    private router: Router
+    private router: Router,
+    private translationService: TranslationService
   ) {
     this.user$ = this.authService.user$;
   }
@@ -198,8 +200,9 @@ export class SettingsPage implements OnInit {
   applySettings() {
     console.log('Applying settings:', this.settings);
 
-    // Language: set document language attribute
+    // Language: set document language attribute and update translation service
     document.documentElement.lang = this.settings.language === 'filipino' ? 'fil' : 'en';
+    this.translationService.setLanguage(this.settings.language);
     console.log('Language set to:', document.documentElement.lang);
 
     // Text size: apply a class to body

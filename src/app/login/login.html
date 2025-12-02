@@ -17,7 +17,7 @@
           <form (ngSubmit)="onLogin()" #loginForm="ngForm">
             <div class="mb-3">
               <label class="form-label fw-medium">Email / Username</label>
-              <input type="text" class="form-control form-control-lg" [(ngModel)]="email" name="email" placeholder="Enter your email" required>
+              <input type="text" class="form-control form-control-lg" [(ngModel)]="emailOrUsername" name="emailOrUsername" placeholder="Enter your email or username" required>
             </div>
 
             <div class="mb-3">
@@ -42,8 +42,18 @@
       <!-- Language Selector -->
       <div class="text-center mt-3">
         <div class="btn-group btn-group-sm" role="group">
-          <button type="button" class="btn btn-outline-secondary active">English</button>
-          <button type="button" class="btn btn-outline-secondary">Filipino</button>
+          <button type="button" 
+                  class="btn btn-outline-secondary" 
+                  [class.active]="translationService.language() === 'english'"
+                  (click)="setLanguage('english')">
+            English
+          </button>
+          <button type="button" 
+                  class="btn btn-outline-secondary" 
+                  [class.active]="translationService.language() === 'filipino'"
+                  (click)="setLanguage('filipino')">
+            Filipino
+          </button>
         </div>
       </div>
     </div>

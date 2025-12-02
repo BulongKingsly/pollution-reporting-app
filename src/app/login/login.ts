@@ -4,6 +4,7 @@ import { AuthService, AppUser } from '../services/auth-guard';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { take } from 'rxjs/operators';
+import { TranslationService, Language } from '../services/translation.service';
 
 @Component({
   selector: 'app-login',
@@ -11,18 +12,22 @@ import { take } from 'rxjs/operators';
   imports: [RouterLink, CommonModule, FormsModule],
 })
 export class Login {
-  email = '';
+  emailOrUsername = '';
   password = '';
   errorMessage = '';
 
-  constructor(private auth: AuthService, private router: Router) {}
+  constructor(
+    private auth: AuthService,
+    private router: Router,
+    public translationService: TranslationService
+  ) {}
 
   async onLogin() {
     this.errorMessage = '';
 
     try {
-      // Sign in with Firebase Auth
-      await this.auth.login(this.email, this.password);
+      // Sign in with Firebase Auth (supports both email and username)
+      await this.auth.login(this.emailOrUsername, this.password);
 
       // Subscribe once to user$ to get Firestore user and redirect
       this.auth.user$.pipe(take(1)).subscribe((user: AppUser | null) => {
@@ -37,5 +42,9 @@ export class Login {
     } catch (error: any) {
       this.errorMessage = error.message || 'Login failed';
     }
+  }
+
+  setLanguage(lang: Language) {
+    this.translationService.setLanguage(lang);
   }
 }

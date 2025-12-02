@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, AfterViewInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -12,16 +12,19 @@ import { Observable, firstValueFrom } from 'rxjs';
 import { take } from 'rxjs/operators';
 import { AppUser, Report, Announcement } from '../interfaces';
 import { Router } from '@angular/router';
+import * as L from 'leaflet';
+import { TranslatePipe } from '../pipes/translate.pipe';
+import { TranslationService } from '../services/translation.service';
 
 @Component({
   selector: 'app-admin-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [CommonModule, FormsModule, RouterLink, TranslatePipe],
   templateUrl: './admin-dashboard.html',
   styleUrls: ['./admin-dashboard.css']
 })
-export class AdminDashboard implements OnInit {
-  activeTab: 'reports' | 'announcements' | 'users' | 'analytics' | 'barangays' = 'reports';
+export class AdminDashboard implements OnInit, AfterViewInit {
+  activeTab: 'reports' | 'announcements' | 'users' | 'analytics' | 'barangays' | 'tasks' = 'reports';
 
   reports: (Report & { id?: string })[] = [];
   announcements: (Announcement & { id?: string })[] = [];
@@ -31,6 +34,15 @@ export class AdminDashboard implements OnInit {
 
   filterStatus: 'all' | 'Pending' | 'In Progress' | 'Done' = 'all';
   responseText: Record<string, string> = {};
+
+  // Comment tracking
+  commentTexts: { [reportId: string]: string } = {};
+
+  // Map tracking
+  private maps: { [reportId: string]: L.Map } = {};
+
+  // Image modal tracking
+  selectedImage: string | null = null;
 
   announcementModel: Partial<Announcement> = {
     title: '',
@@ -98,7 +110,7 @@ export class AdminDashboard implements OnInit {
 
   isMainAdmin = false;
 
-  setTab(tab: 'reports' | 'announcements' | 'users' | 'analytics' | 'barangays') {
+  setTab(tab: 'reports' | 'announcements' | 'users' | 'analytics' | 'barangays' | 'tasks') {
     this.activeTab = tab;
   }
 
@@ -122,8 +134,19 @@ export class AdminDashboard implements OnInit {
   }
 
   filteredReports() {
-    if (this.filterStatus === 'all') return this.reports;
-    return this.reports.filter(r => r.status === this.filterStatus);
+    const approvedReports = this.reports.filter(r => r.approved === true);
+    if (this.filterStatus === 'all') return approvedReports;
+    return approvedReports.filter(r => r.status === this.filterStatus);
+  }
+
+  /** Get reports pending approval (not approved yet) */
+  getPendingReports(): (Report & { id?: string })[] {
+    return this.reports.filter(r => r.approved === false || r.approved === undefined || r.approved === null);
+  }
+
+  /** Get count of pending approvals for badge */
+  getPendingApprovalCount(): number {
+    return this.getPendingReports().length;
   }
 
   async updateStatus(report: Report & { id?: string }, status: 'Pending' | 'In Progress' | 'Done') {
@@ -160,6 +183,32 @@ export class AdminDashboard implements OnInit {
     } catch (err) {
       console.error('Failed to delete report', err);
       this.showToast('Failed to delete report: ' + ((err as any)?.message || ''), 'danger');
+    }
+  }
+
+  /** Approve a report to make it visible on home page */
+  async approveReport(report: Report & { id?: string }) {
+    if (!report.id) return;
+    try {
+      await this.reportsService.updateReport(report.id, { approved: true });
+      report.approved = true;
+      this.showToast('Report approved and will now appear on home page', 'success');
+    } catch (err) {
+      console.error('Failed to approve report', err);
+      this.showToast('Failed to approve report: ' + ((err as any)?.message || ''), 'danger');
+    }
+  }
+
+  /** Unapprove a report to hide it from home page */
+  async unapproveReport(report: Report & { id?: string }) {
+    if (!report.id) return;
+    try {
+      await this.reportsService.updateReport(report.id, { approved: false });
+      report.approved = false;
+      this.showToast('Report unapproved and hidden from home page', 'success');
+    } catch (err) {
+      console.error('Failed to unapprove report', err);
+      this.showToast('Failed to unapprove report: ' + ((err as any)?.message || ''), 'danger');
     }
   }
 
@@ -273,7 +322,47 @@ export class AdminDashboard implements OnInit {
 
   getUserEmail(uid: string) {
     const u = (this.users || []).find(x => x.uid === uid);
-    return u ? u.email : uid;
+    return u ? (u.username || u.email || uid) : uid;
+  }
+
+  // Get admins for a barangay by checking both adminIds array and user.barangay field
+  getBarangayAdmins(barangayId: string): AppUser[] {
+    if (!barangayId) return [];
+    return (this.users || []).filter(u =>
+      u.role === 'admin' && u.barangay === barangayId
+    );
+  }
+
+  // Sync barangay adminIds with actual users who have this barangay assigned
+  async syncBarangayAdmins(barangayId: string) {
+    if (!barangayId) return;
+    try {
+      const admins = this.getBarangayAdmins(barangayId);
+      const barangay = this.barangays.find(b => b.id === barangayId);
+      if (!barangay) return;
+
+      // Get current adminIds from barangay
+      const currentAdminIds = barangay.adminIds || [];
+      const actualAdminIds = admins.map(a => a.uid);
+
+      // Find admins to add (in user data but not in barangay adminIds)
+      const toAdd = actualAdminIds.filter(id => !currentAdminIds.includes(id));
+
+      // Add missing admins to barangay
+      for (const adminId of toAdd) {
+        await this.barangaysService.assignAdmin(barangayId, adminId);
+      }
+
+      if (toAdd.length > 0) {
+        this.showToast(`Synced ${toAdd.length} admin(s) to barangay`, 'success');
+        this.loadBarangays();
+      } else {
+        this.showToast('Barangay admins already in sync', 'info');
+      }
+    } catch (err) {
+      console.error('Failed to sync admins', err);
+      this.showToast('Failed to sync admins: ' + ((err as any)?.message || ''), 'danger');
+    }
   }
 
   getBarangayName(barangayId: string | null | undefined): string {
@@ -341,9 +430,55 @@ export class AdminDashboard implements OnInit {
     }
 
     try {
-      await this.usersService.updateRoleByMainAdmin(user.uid, role);
-      user.role = role;
-      this.showToast(`User role updated to ${role}`, 'success');
+      if (role === 'admin') {
+        // Check if user has a barangay assigned
+        if (!user.barangay) {
+          this.showToast('User must be assigned to a barangay first. Please assign them to a barangay in the user details.', 'warning');
+          return;
+        }
+
+        // Check if this barangay already has an admin
+        const existingAdmins = this.getBarangayAdmins(user.barangay);
+        if (existingAdmins.length > 0 && !existingAdmins.some(a => a.uid === user.uid)) {
+          const confirmed = await this.showConfirm(
+            `${user.barangay} already has an admin (${existingAdmins[0].username || existingAdmins[0].email}). Only 1 admin per barangay is allowed. Replace with ${user.username || user.email}?`
+          );
+          if (!confirmed) return;
+
+          // Remove existing admin(s)
+          for (const existingAdmin of existingAdmins) {
+            await this.usersService.updateRoleByMainAdmin(existingAdmin.uid, 'user');
+            await this.barangaysService.removeAdmin(user.barangay, existingAdmin.uid);
+          }
+        }
+
+        // Promote user to admin
+        await this.usersService.updateRoleByMainAdmin(user.uid, 'admin');
+
+        // Sync with barangay adminIds array
+        await this.barangaysService.assignAdmin(user.barangay, user.uid);
+
+        user.role = 'admin';
+        this.showToast(`${user.username || user.email} is now admin of ${user.barangay}`, 'success');
+
+        // Reload to update UI
+        this.loadUsers();
+        this.loadBarangays();
+      } else {
+        // Demoting from admin to user
+        if (user.barangay) {
+          // Remove from barangay adminIds
+          await this.barangaysService.removeAdmin(user.barangay, user.uid);
+        }
+
+        await this.usersService.updateRoleByMainAdmin(user.uid, 'user');
+        user.role = 'user';
+        this.showToast(`${user.username || user.email} is now a regular user`, 'success');
+
+        // Reload to update UI
+        this.loadUsers();
+        this.loadBarangays();
+      }
     } catch (err) {
       console.error('Failed to update role', err);
       this.showToast('Failed to update role: ' + ((err as any)?.message || ''), 'danger');
@@ -541,6 +676,21 @@ export class AdminDashboard implements OnInit {
     return Object.keys(this.reportsByBarangay).sort();
   }
 
+  /** Convert Firestore Timestamp to JavaScript Date for display */
+  toDate(timestamp: any): Date | null {
+    if (!timestamp) return null;
+    // Check if it's a Firestore Timestamp
+    if (timestamp.toDate && typeof timestamp.toDate === 'function') {
+      return timestamp.toDate();
+    }
+    // Check if it's already a Date
+    if (timestamp instanceof Date) {
+      return timestamp;
+    }
+    // Try to parse as date string
+    return new Date(timestamp);
+  }
+
   async logout() {
     try {
       await this.auth.logout();
@@ -548,5 +698,125 @@ export class AdminDashboard implements OnInit {
     } catch (err) {
       console.error('Logout failed', err);
     }
+  }
+
+  ngAfterViewInit() {
+    // Maps will be initialized when needed
+  }
+
+  initializeMap(reportId: string, lat: number, lng: number, prefix: string = 'admin-map-'): void {
+    const mapId = `${prefix}${reportId}`;
+
+    // Destroy existing map if any
+    if (this.maps[mapId]) {
+      this.maps[mapId].remove();
+      delete this.maps[mapId];
+    }
+
+    // Wait for DOM to be ready
+    setTimeout(() => {
+      const mapElement = document.getElementById(mapId);
+      if (!mapElement) return;
+
+      const map = L.map(mapId).setView([lat, lng], 15);
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors'
+      }).addTo(map);
+
+      L.marker([lat, lng]).addTo(map)
+        .bindPopup('Report Location')
+        .openPopup();
+
+      this.maps[mapId] = map;
+
+      // Invalidate size to ensure proper rendering
+      setTimeout(() => map.invalidateSize(), 100);
+    }, 100);
+  }
+
+  async addCommentToReport(reportId: string): Promise<void> {
+    if (!reportId) {
+      alert('Invalid report ID');
+      console.error('Report ID is missing');
+      return;
+    }
+
+    const user = await firstValueFrom(this.user$.pipe(take(1)));
+    if (!user || user.role !== 'admin') {
+      alert('Only admins can add comments');
+      return;
+    }
+
+    const commentText = this.commentTexts[reportId]?.trim();
+    if (!commentText) {
+      alert('Please enter a comment');
+      return;
+    }
+
+    try {
+      console.log('Adding comment to report:', reportId);
+      await this.reportsService.addComment(
+        reportId,
+        user.uid,
+        user.email || 'Admin',
+        user.role,
+        commentText
+      );
+
+      // Clear the input
+      this.commentTexts[reportId] = '';
+
+      // Reload reports to show new comment
+      await this.loadReports();
+
+      alert('Comment added successfully');
+    } catch (err) {
+      console.error('Failed to add comment', err);
+      alert('Failed to add comment: ' + (err as Error).message);
+    }
+  }
+
+  formatCommentDate(timestamp: any): Date {
+    if (!timestamp) return new Date();
+    if (typeof timestamp.toDate === 'function') {
+      return timestamp.toDate();
+    }
+    if (timestamp instanceof Date) {
+      return timestamp;
+    }
+    return new Date(timestamp);
+  }
+
+  formatTimestamp(timestamp: any): Date | null {
+    if (!timestamp) return null;
+    if (typeof timestamp.toDate === 'function') {
+      return timestamp.toDate();
+    }
+    if (timestamp instanceof Date) {
+      return timestamp;
+    }
+    if (timestamp.seconds) {
+      return new Date(timestamp.seconds * 1000);
+    }
+    return new Date(timestamp);
+  }
+
+  getInitials(name: string): string {
+    if (!name) return '';
+    return name.split(' ').map(n => n[0]).join('').toUpperCase();
+  }
+
+  getUserProfilePicture(userId: string): string | null {
+    const user = this.users.find(u => u.uid === userId);
+    return user?.profilePictureUrl || null;
+  }
+
+  openImageModal(imageUrl: string): void {
+    this.selectedImage = imageUrl;
+  }
+
+  closeImageModal(): void {
+    this.selectedImage = null;
   }
 }

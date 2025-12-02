@@ -438,7 +438,9 @@ export class SubmitReport {
         imageUrls: uploadedUrls,
         dateTaken: this.report.dateTaken,
         timeTaken: this.report.timeTaken,
-        barangayId: (user as any).barangay
+        barangayId: (user as any).barangay,
+        lat: this.report.lat,
+        lng: this.report.lng
       });
 
       // reset form

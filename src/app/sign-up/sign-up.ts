@@ -13,6 +13,7 @@ import { Observable } from 'rxjs';
   imports: [RouterLink, CommonModule, FormsModule],
 })
 export class SignUp {
+  username = '';
   fullName = '';
   email = '';
   contact = '';
@@ -37,9 +38,23 @@ export class SignUp {
       return;
     }
 
+    // Check if username already exists
+    if (this.username) {
+      try {
+        const usernameExists = await this.auth.checkUsernameExists(this.username);
+        if (usernameExists) {
+          this.errorMessage = 'Username already taken. Please choose a different one.';
+          return;
+        }
+      } catch (error: any) {
+        this.errorMessage = 'Error checking username availability';
+        return;
+      }
+    }
+
     try {
       // Register user with default role 'user'
-      await this.auth.register(this.email, this.password, 'user', this.selectedBarangay);
+      await this.auth.register(this.email, this.password, 'user', this.selectedBarangay, this.fullName, this.contact, this.address, this.username);
 
       // Success message
       this.successMessage = 'Account created successfully! Redirecting to home...';

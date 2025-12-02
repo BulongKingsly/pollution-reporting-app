@@ -14,6 +14,7 @@ import { UnauthorizedComponent } from './unauthorized/unauthorized';
 import { BarangayAdminGuard } from './guard/barangay-admin-guard';
 import { BarangayAdminComponent } from './barangay-admin/barangay-admin';
 import { AnalyticsComponent } from './analytics/analytics';
+import { UserGuard } from './guard/user-guard';
 
 export const routes: Routes = [
   // Default route.
@@ -24,9 +25,9 @@ export const routes: Routes = [
   { path: 'sign-up', component: SignUp },
   { path: 'reset-password', component: ResetPassword },
   { path: 'home', component: Home },
+  { path: 'help', component: HelpPage, canActivate: [UserGuard] }, // Public but blocked for admins
 
-  // Protected pages (all require AuthGuard except home/login/sign-up/reset-password)
-  { path: 'help', component: HelpPage, canActivate: [AuthGuard] },
+  // Protected pages (require authentication)
   { path: 'profile', component: Profile, canActivate: [AuthGuard] },
   { path: 'settings', component: SettingsPage, canActivate: [AuthGuard] },
   { path: 'submit-report', component: SubmitReport, canActivate: [AuthGuard] },

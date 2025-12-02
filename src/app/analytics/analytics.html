@@ -6,6 +6,21 @@
     </button>
   </div>
 
+  <!-- Barangay Selector for Main Admin -->
+  <div *ngIf="isMainAdmin" class="card mb-3">
+    <div class="card-body">
+      <div class="row align-items-center">
+        <div class="col-md-6">
+          <label class="form-label fw-medium">Select Barangay</label>
+          <select class="form-select" [(ngModel)]="selectedBarangay" (change)="onBarangayChange()">
+            <option value="">All Barangays</option>
+            <option *ngFor="let b of (barangays$ | async)" [value]="b.id">{{ b.name }}</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="row g-3">
     <div class="col-md-3">
       <div class="card stat-card">
@@ -16,7 +31,7 @@
       </div>
     </div>
 
-    <div class="col-md-3" *ngFor="let t of ['water','air','land']">
+    <div class="col-md-3" *ngFor="let t of pollutionTypes">
       <div class="card stat-card">
         <div class="card-body text-center">
           <h4>{{ countsByType[t] || 0 }}</h4>

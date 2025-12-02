@@ -61,7 +61,7 @@
                   <input class="form-control" type="number" step="0.000001" [(ngModel)]="newStreetLng" placeholder="Longitude" title="Longitude">
                 </div>
               </div>
-              <small class="text-muted d-block mt-1">💡 Tip: Use <a href="https://www.google.com/maps" target="_blank" rel="noopener">Google Maps</a> to find coordinates</small>
+              <small class="text-muted d-block mt-1">💡 Tip: Use <a href="https://www.openstreetmap.org/" target="_blank" rel="noopener">OpenStreetMap</a> to find coordinates</small>
             </div>
             <button class="btn btn-primary w-100" (click)="addStreet()">Add Street</button>
           </div>
@@ -103,16 +103,20 @@
           <div class="card-body">
             <h5>Users in barangay</h5>
             <ul class="list-group">
-              <li *ngFor="let u of users" class="list-group-item d-flex justify-content-between align-items-center">
-                <div>
-                  <div>{{ u.email }}</div>
-                  <small class="text-muted">{{ u.uid }}</small>
-                </div>
-                <div class="d-flex gap-2 align-items-center">
-                  <span class="badge bg-secondary">{{ u.role }}</span>
-                  <button *ngIf="u.role !== 'admin'" class="btn btn-sm btn-outline-primary" (click)="promoteUserToAdmin(u)">Promote</button>
-                  <button *ngIf="u.role === 'admin'" class="btn btn-sm btn-outline-warning" (click)="demoteAdminToUser(u)">Demote</button>
-                  <button class="btn btn-sm btn-outline-danger" (click)="suspendUser(u)">Suspend</button>
+              <li *ngFor="let u of users" class="list-group-item">
+                <div class="row g-2 align-items-center">
+                  <div class="col-12 col-md-6">
+                    <div>{{ u.email }}</div>
+                    <small class="text-muted text-break">{{ u.uid }}</small>
+                  </div>
+                  <div class="col-12 col-md-6">
+                    <div class="d-flex flex-wrap gap-2 align-items-center justify-content-md-end">
+                      <span class="badge bg-secondary">{{ u.role }}</span>
+                      <button *ngIf="u.role !== 'admin'" class="btn btn-sm btn-outline-primary" (click)="promoteUserToAdmin(u)">Promote</button>
+                      <button *ngIf="u.role === 'admin'" class="btn btn-sm btn-outline-warning" (click)="demoteAdminToUser(u)">Demote</button>
+                      <button class="btn btn-sm btn-outline-danger" (click)="suspendUser(u)">Suspend</button>
+                    </div>
+                  </div>
                 </div>
               </li>
             </ul>

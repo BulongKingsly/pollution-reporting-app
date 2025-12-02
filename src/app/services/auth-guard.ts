@@ -1,11 +1,16 @@
 import { Injectable } from '@angular/core';
 import { Auth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, authState, User as FirebaseUser, sendPasswordResetEmail } from '@angular/fire/auth';
-import { Firestore, doc, setDoc, docData, updateDoc } from '@angular/fire/firestore';
+import { Firestore, doc, setDoc, docData, updateDoc, collection, query, where, getDocs } from '@angular/fire/firestore';
 import { Observable, of, switchMap, take } from 'rxjs';
 
 export interface AppUser {
   uid: string;
   email: string | null;
+  username?: string;  // Unique username
+  fullName?: string;  // Full name from sign-up
+  contact?: string;  // Contact number
+  address?: string;  // Physical address
+  profilePictureUrl?: string;  // Profile picture URL
   role: 'user' | 'admin';
   createdAt: any;
   barangay: string;
@@ -37,12 +42,24 @@ export class AuthService {
     );
   }
 
-  async register(email: string, password: string, role: 'user' | 'admin' = 'user', barangay: string = ''): Promise<void> {
+  async register(email: string, password: string, role: 'user' | 'admin' = 'user', barangay: string = '', fullName?: string, contact?: string, address?: string, username?: string): Promise<void> {
+    // Double-check username uniqueness before creating account
+    if (username) {
+      const exists = await this.checkUsernameExists(username);
+      if (exists) {
+        throw new Error('Username already taken. Please choose a different one.');
+      }
+    }
+
     const credential = await createUserWithEmailAndPassword(this.auth, email, password);
     const userRef = doc(this.firestore, `users/${credential.user.uid}`);
     await setDoc(userRef, {
       uid: credential.user.uid,
       email: credential.user.email,
+      username: username || '',
+      fullName: fullName || '',
+      contact: contact || '',
+      address: address || '',
       role,
       barangay,
       createdAt: new Date(),
@@ -55,7 +72,40 @@ export class AuthService {
     });
   }
 
-  async login(email: string, password: string): Promise<void> {
+  async checkUsernameExists(username: string): Promise<boolean> {
+    if (!username) return false;
+
+    const usersCollection = collection(this.firestore, 'users');
+    const q = query(usersCollection, where('username', '==', username));
+    const querySnapshot = await getDocs(q);
+
+    return !querySnapshot.empty;
+  }
+
+  async login(emailOrUsername: string, password: string): Promise<void> {
+    let email = emailOrUsername;
+
+    // Check if input is a username (not an email format)
+    if (!emailOrUsername.includes('@')) {
+      // Query Firestore to find user by username
+      const usersCollection = collection(this.firestore, 'users');
+      const q = query(usersCollection, where('username', '==', emailOrUsername));
+      const querySnapshot = await getDocs(q);
+
+      if (querySnapshot.empty) {
+        throw new Error('User not found. Please check your username or email.');
+      }
+
+      // Get the email from the user document
+      const userDoc = querySnapshot.docs[0].data() as AppUser;
+      email = userDoc.email || '';
+
+      if (!email) {
+        throw new Error('No email associated with this username.');
+      }
+    }
+
+    // Sign in with email
     const credential = await signInWithEmailAndPassword(this.auth, email, password);
 
     // Check if user is suspended
@@ -79,6 +129,11 @@ export class AuthService {
   async updateSettings(uid: string, settings: AppUser['settings']): Promise<void> {
     const userRef = doc(this.firestore, `users/${uid}`);
     await updateDoc(userRef, { settings });
+  }
+
+  async updateProfile(uid: string, updates: { username?: string; fullName?: string; contact?: string; address?: string; profilePictureUrl?: string }): Promise<void> {
+    const userRef = doc(this.firestore, `users/${uid}`);
+    await updateDoc(userRef, updates);
   }
 
   getCurrentUserSync(): AppUser | null {

@@ -10,7 +10,9 @@ import {
   doc,
   updateDoc,
   orderBy,
-  deleteDoc
+  deleteDoc,
+  increment,
+  arrayUnion
 } from '@angular/fire/firestore';
 
 import { getStorage, ref } from '@angular/fire/storage';
@@ -101,10 +103,11 @@ export class ReportsService {
       description: reportData.description,
       images: imageUrls,
       reporterId: user.uid,
-      reporterName: user.email || 'Anonymous',
+      reporterName: user.username || user.fullName || user.email || 'Anonymous',
       barangayId: reportData.barangayId || (user?.barangay || null),
       status: 'Pending',
       upvotes: 0,
+      approved: false,
       createdAt: serverTimestamp()
     };
 
@@ -121,6 +124,8 @@ export class ReportsService {
     dateTaken?: string;
     timeTaken?: string;
     barangayId?: string;
+    lat?: number;
+    lng?: number;
   }) {
     const reportsCollection = collection(this.firestore, 'reports');
     const newReport: any = {
@@ -131,10 +136,14 @@ export class ReportsService {
       description: payload.description,
       images: payload.imageUrls || [],
       reporterId: user.uid,
-      reporterName: user.email || 'Anonymous',
+      reporterName: user.username || user.fullName || user.email || 'Anonymous',
       barangayId: payload.barangayId || (user?.barangay || null),
       status: 'Pending',
       upvotes: 0,
+      lat: payload.lat,
+      lng: payload.lng,
+      comments: [],
+      approved: false,
       createdAt: serverTimestamp()
     };
 
@@ -209,10 +218,13 @@ export class ReportsService {
     await updateDoc(reportDoc, data);
   }
 
-  /** Increment upvotes for a report (simple implementation) */
-  async upvoteReport(reportId: string, currentUpvotes: number): Promise<void> {
+  /** Increment upvotes for a report and track the user */
+  async upvoteReport(reportId: string, userId: string): Promise<void> {
     const reportDoc = doc(this.firestore, `reports/${reportId}`);
-    await updateDoc(reportDoc, { upvotes: (currentUpvotes || 0) + 1 });
+    await updateDoc(reportDoc, {
+      upvotes: increment(1),
+      upvotedBy: arrayUnion(userId)
+    });
   }
 
   /** DELETE a report (simple - no storage cleanup) */
@@ -249,5 +261,20 @@ export class ReportsService {
     // Delete Firestore document
     const reportDoc = doc(this.firestore, `reports/${reportId}`);
     await deleteDoc(reportDoc);
+  }
+
+  /** Add a comment to a report (admin only) */
+  async addComment(reportId: string, userId: string, userName: string, userRole: 'user' | 'admin', commentText: string): Promise<void> {
+    const reportDoc = doc(this.firestore, `reports/${reportId}`);
+    const comment = {
+      userId,
+      userName,
+      userRole,
+      text: commentText,
+      createdAt: new Date() // Use regular Date instead of serverTimestamp() in arrayUnion
+    };
+    await updateDoc(reportDoc, {
+      comments: arrayUnion(comment)
+    });
   }
 }
