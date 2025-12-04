@@ -215,7 +215,11 @@ export class Home implements AfterViewInit {
     if (!report.id) return;
 
     const user = this.user();
-    if (!user) return;
+    if (!user) {
+      alert('Please login to upvote reports');
+      this.router.navigate(['/login']);
+      return;
+    }
 
     if (user.role === 'admin') {
       alert('Admins cannot upvote reports');
@@ -256,7 +260,20 @@ export class Home implements AfterViewInit {
   }
 
   ngAfterViewInit() {
-    // Maps will be initialized when reports are expanded
+    // Fix Leaflet marker icon paths
+    this.fixLeafletIcons();
+  }
+
+  private fixLeafletIcons(): void {
+    // Fix marker icon - use default icon from Leaflet CDN
+    if (L.Icon && L.Icon.Default && L.Icon.Default.prototype) {
+      delete (L.Icon.Default.prototype as any)._getIconUrl;
+      L.Icon.Default.mergeOptions({
+        iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+        iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+        shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png'
+      });
+    }
   }
 
   initializeMap(reportId: string, lat: number, lng: number): void {
@@ -290,7 +307,13 @@ export class Home implements AfterViewInit {
 
   async addComment(reportId: string): Promise<void> {
     const user = this.user();
-    if (!user || user.role !== 'admin') {
+    if (!user) {
+      alert('Please login to add comments');
+      this.router.navigate(['/login']);
+      return;
+    }
+
+    if (user.role !== 'admin') {
       alert('Only admins can add comments');
       return;
     }

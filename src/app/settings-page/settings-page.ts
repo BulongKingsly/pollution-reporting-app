@@ -223,19 +223,34 @@ export class SettingsPage implements OnInit {
 
     // Store in localStorage for immediate access on next page load
     localStorage.setItem('userSettings', JSON.stringify(this.settings));
-  }  // Apply theme immediately on change (for instant feedback)
-  onThemeChange() {
+  }  // Apply and auto-save appearance changes
+  async onThemeChange() {
     console.log('Theme changed to:', this.settings.theme);
     this.applySettings();
+    await this.autoSaveSettings();
   }
 
-  onLanguageChange() {
-    console.log('Language changed to:', this.settings.language);
-    this.applySettings();
-  }
-
-  onTextSizeChange() {
+  async onTextSizeChange() {
     console.log('Text size changed to:', this.settings.textSize);
     this.applySettings();
+    await this.autoSaveSettings();
+  }
+
+  async autoSaveSettings() {
+    const user = await this.user$.pipe(take(1)).toPromise();
+    if (!user) return;
+
+    try {
+      const userRef = doc(this.firestore, `users/${user.uid}`);
+      await updateDoc(userRef, {
+        settings: {
+          ...this.settings,
+          updatedAt: Timestamp.now()
+        }
+      });
+      localStorage.setItem('userSettings', JSON.stringify(this.settings));
+    } catch (error) {
+      console.error('Failed to auto-save settings:', error);
+    }
   }
 }

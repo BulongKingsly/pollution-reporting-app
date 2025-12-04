@@ -11,11 +11,15 @@
 
     <div class="collapse navbar-collapse" id="navbarNav">
       <ul class="navbar-nav ms-auto align-items-center">
-        <li class="nav-item"><a class="nav-link" routerLink="/home"><i class="fas fa-home me-1"></i> Home</a></li>@if ((user$ | async)?.role !== 'admin') {<li class="nav-item"><a class="nav-link" routerLink="/help"><i class="fas fa-question-circle me-1"></i> Help</a></li>}<li class="nav-item"><a class="nav-link" routerLink="/settings"><i class="fas fa-cog me-1"></i> Settings</a></li>
+        <li class="nav-item"><a class="nav-link active" routerLink="/home"><i class="fas fa-home me-1"></i> Home</a></li>
+        <li class="nav-item"><a class="nav-link" routerLink="/help"><i class="fas fa-question-circle me-1"></i> Help</a></li>
+        <li class="nav-item" *ngIf="user$ | async as user">
+          <a class="nav-link" routerLink="/settings"><i class="fas fa-cog me-1"></i> Settings</a>
+        </li>
         <li class="nav-item" *ngIf="(user$ | async)?.role === 'admin'">
           <a class="nav-link" routerLink="/admin"><i class="fas fa-shield-alt me-1"></i> Admin</a>
         </li>
-        <li class="nav-item ms-lg-3">
+        <li class="nav-item ms-lg-3" *ngIf="user$ | async">
           <a class="btn btn-success" routerLink="/submit-report"><i class="fas fa-plus me-1"></i> New Report</a>
         </li>
         <li class="nav-item dropdown ms-lg-2" *ngIf="user$ | async as user">
@@ -39,7 +43,10 @@
             <li><a class="dropdown-item text-danger" (click)="logout()"><i class="fas fa-sign-out-alt me-2"></i>Logout</a></li>
           </ul>
         </li>
-
+        <!-- Not logged in - show login button -->
+        <li class="nav-item ms-lg-3" *ngIf="!(user$ | async)">
+          <a class="btn btn-success" routerLink="/login"><i class="fas fa-sign-in-alt me-1"></i> Login</a>
+        </li>
       </ul>
     </div>
   </div>
@@ -47,6 +54,15 @@
 
 <!-- Main Content -->
 <div class="container mt-4">
+  <!-- Login Prompt for Non-Logged In Users -->
+  <div class="alert alert-info d-flex align-items-center mb-4" *ngIf="!(user$ | async)">
+    <i class="fas fa-info-circle me-3 fs-4"></i>
+    <div>
+      <strong>Welcome to Pollution Report!</strong>
+      <p class="mb-0">Please <a routerLink="/login" class="alert-link fw-bold">login</a> or <a routerLink="/sign-up" class="alert-link fw-bold">create an account</a> to submit reports, upvote, and interact with the community.</p>
+    </div>
+  </div>
+
   <div class="row">
 
     <!-- Search + Filters -->
@@ -84,8 +100,8 @@
       </div>
     </div>
 
-    <!-- Barangay Metrics -->
-    <div class="col-12 mb-4" *ngIf="user()?.barangay">
+    <!-- Barangay Metrics (Admin only) -->
+    <div class="col-12 mb-4" *ngIf="user()?.role === 'admin' && user()?.barangay">
       <div class="row g-3">
         <div class="col-6 col-md-4">
           <div class="card border-0 shadow-sm text-center">
@@ -120,17 +136,63 @@
     <!-- Feed -->
     <div class="col-lg-8 mx-auto">
 
-      <!-- Announcements from Firestore -->
+      <!-- Announcements Carousel from Firestore -->
       <ng-container *ngIf="announcements$ | async as announcements">
-        <div *ngIf="announcements.length > 0" class="card border-0 shadow-sm mb-4 border-start border-4 border-info">
-          <div class="card-body d-flex align-items-start">
-            <i class="fas fa-bullhorn text-info fa-2x me-3"></i>
-            <div>
-              <h5 class="card-title fw-bold mb-2"><i class="fas fa-star text-warning me-1"></i> {{ announcements[0].title }}</h5>
-              <h6 class="fw-semibold">{{ announcements[0].subtitle }}</h6>
-              <p class="card-text text-muted mb-2">{{ announcements[0].description }}</p>
-              <small class="text-muted">Posted {{ formatTimestamp(announcements[0].createdAt) ? (formatTimestamp(announcements[0].createdAt) | date:'short') : 'just now' }} • {{ announcements[0].location }}</small>
+        <div *ngIf="announcements.length > 0" class="mb-4">
+          <div id="announcementsCarousel" class="carousel slide" data-bs-ride="carousel">
+            <!-- Carousel Indicators -->
+            <div class="carousel-indicators" *ngIf="announcements.length > 1">
+              <button *ngFor="let announcement of announcements; let i = index"
+                      type="button"
+                      data-bs-target="#announcementsCarousel"
+                      [attr.data-bs-slide-to]="i"
+                      [class.active]="i === 0"
+                      [attr.aria-current]="i === 0 ? 'true' : null"
+                      [attr.aria-label]="'Slide ' + (i + 1)"></button>
             </div>
+
+            <!-- Carousel Items -->
+            <div class="carousel-inner">
+              <div *ngFor="let announcement of announcements; let i = index"
+                   class="carousel-item"
+                   [class.active]="i === 0">
+                <div class="card border-0 shadow-sm border-start border-4 border-info">
+                  <div class="card-body d-flex align-items-start">
+                    <i class="fas fa-bullhorn text-info fa-2x me-3"></i>
+                    <div class="flex-grow-1">
+                      <h5 class="card-title fw-bold mb-2">
+                        <i class="fas fa-star text-warning me-1"></i> {{ announcement.title }}
+                      </h5>
+                      <h6 class="fw-semibold">{{ announcement.subtitle }}</h6>
+                      <p class="card-text text-muted mb-2">{{ announcement.description }}</p>
+                      <small class="text-muted">
+                        Posted {{ formatTimestamp(announcement.createdAt) ? (formatTimestamp(announcement.createdAt) | date:'short') : 'just now' }} • {{ announcement.location }}
+                      </small>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Carousel Controls -->
+            <button *ngIf="announcements.length > 1"
+                    class="carousel-control-prev"
+                    type="button"
+                    data-bs-target="#announcementsCarousel"
+                    data-bs-slide="prev"
+                    style="width: 5%; left: -5%;">
+              <span class="carousel-control-prev-icon bg-dark rounded-circle p-3" aria-hidden="true"></span>
+              <span class="visually-hidden">Previous</span>
+            </button>
+            <button *ngIf="announcements.length > 1"
+                    class="carousel-control-next"
+                    type="button"
+                    data-bs-target="#announcementsCarousel"
+                    data-bs-slide="next"
+                    style="width: 5%; right: -5%;">
+              <span class="carousel-control-next-icon bg-dark rounded-circle p-3" aria-hidden="true"></span>
+              <span class="visually-hidden">Next</span>
+            </button>
           </div>
         </div>
       </ng-container>
@@ -191,7 +253,17 @@
                 <i class="fas fa-arrow-up me-1"></i>{{ report.upvotes }} Upvotes
               </button>
               <span class="text-muted small"><i class="fas fa-comment me-1"></i>{{ (report.comments || []).length }} Comments</span>
-              <span class="badge bg-warning text-dark ms-auto">{{ report.status }}</span>
+              <span class="badge ms-auto"
+                    [class.bg-warning]="report.status === 'Pending'"
+                    [class.bg-info]="report.status === 'In Progress'"
+                    [class.bg-success]="report.status === 'Done'"
+                    [class.text-dark]="report.status === 'Pending'">
+                <i class="fas"
+                   [class.fa-clock]="report.status === 'Pending'"
+                   [class.fa-spinner]="report.status === 'In Progress'"
+                   [class.fa-check-circle]="report.status === 'Done'"
+                   class="me-1"></i>{{ report.status }}
+              </span>
             </div>
 
             <!-- Map Display (if coordinates exist) -->

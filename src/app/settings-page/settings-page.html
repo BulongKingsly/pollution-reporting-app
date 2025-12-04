@@ -56,61 +56,27 @@
           <h5 class="mb-0"><i class="fas fa-palette me-2"></i>Appearance</h5>
         </div>
         <div class="card-body">
-          <form (ngSubmit)="saveSettings()">
-            <div class="row">
-              <div class="col-md-6 mb-3">
-                <label class="form-label fw-bold">Theme</label>
-                <select class="form-select" title="Theme" [(ngModel)]="settings.theme" name="theme" (change)="onThemeChange()">
-                  <option value="light">☀️ Light</option>
-                  <option value="dark">🌙 Dark</option>
-                </select>
-                <small class="text-muted">Change the visual theme of the app</small>
-              </div>
-
-              <div class="col-md-6 mb-3">
-                <label class="form-label fw-bold">Text Size</label>
-                <select class="form-select" title="Text size" [(ngModel)]="settings.textSize" name="textSize" (change)="onTextSizeChange()">
-                  <option value="small">Small</option>
-                  <option value="medium">Medium</option>
-                  <option value="large">Large</option>
-                </select>
-                <small class="text-muted">Adjust text size for readability</small>
-              </div>
-            </div>
-
-            <div class="d-flex gap-2">
-              <button class="btn btn-success" type="submit" [disabled]="isSavingSettings">
-                <span *ngIf="isSavingSettings" class="spinner-border spinner-border-sm me-2"></span>
-                {{ isSavingSettings ? 'Saving...' : 'Save Appearance' }}
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-
-      <!-- Language Settings Card -->
-      <div class="card shadow-sm mb-4">
-        <div class="card-header bg-primary text-white">
-          <h5 class="mb-0"><i class="fas fa-language me-2"></i>Language</h5>
-        </div>
-        <div class="card-body">
-          <form (ngSubmit)="saveSettings()">
-            <div class="mb-3">
-              <label class="form-label fw-bold">Preferred Language</label>
-              <select class="form-select" title="Language" [(ngModel)]="settings.language" name="language" (change)="onLanguageChange()">
-                <option value="english">🇺🇸 English</option>
-                <option value="filipino">🇵🇭 Filipino</option>
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label fw-bold">Theme</label>
+              <select class="form-select" title="Theme" [(ngModel)]="settings.theme" name="theme" (change)="onThemeChange()">
+                <option value="light">☀️ Light</option>
+                <option value="dark">🌙 Dark</option>
               </select>
-              <small class="text-muted">Select your preferred language</small>
+              <small class="text-muted">Change the visual theme of the app</small>
             </div>
 
-            <div class="d-flex gap-2">
-              <button class="btn btn-primary" type="submit" [disabled]="isSavingSettings">
-                <span *ngIf="isSavingSettings" class="spinner-border spinner-border-sm me-2"></span>
-                {{ isSavingSettings ? 'Saving...' : 'Save Language' }}
-              </button>
+            <div class="col-md-6 mb-3">
+              <label class="form-label fw-bold">Text Size</label>
+              <select class="form-select" title="Text size" [(ngModel)]="settings.textSize" name="textSize" (change)="onTextSizeChange()">
+                <option value="small">Small</option>
+                <option value="medium">Medium</option>
+                <option value="large">Large</option>
+              </select>
+              <small class="text-muted">Adjust text size for readability</small>
             </div>
-          </form>
+          </div>
+          <small class="text-muted"><i class="fas fa-info-circle me-1"></i>Changes are saved automatically</small>
         </div>
       </div>
 

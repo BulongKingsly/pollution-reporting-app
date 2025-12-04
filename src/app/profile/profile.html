@@ -12,9 +12,7 @@
     <div class="collapse navbar-collapse" id="navbarNav">
       <ul class="navbar-nav ms-auto align-items-center">
 
-        <li class="nav-item"><a class="nav-link" routerLink="/home"><i class="fas fa-home me-1"></i> Home</a></li>
-        <li class="nav-item"><a class="nav-link" routerLink="/help"><i class="fas fa-question-circle me-1"></i> Help</a></li>
-        <li class="nav-item"><a class="nav-link" routerLink="/settings"><i class="fas fa-cog me-1"></i> Settings</a></li>
+        <li class="nav-item"><a class="nav-link" routerLink="/home"><i class="fas fa-home me-1"></i> Home</a></li>@if ((user$ | async)?.role !== 'admin') {<li class="nav-item"><a class="nav-link" routerLink="/help"><i class="fas fa-question-circle me-1"></i> Help</a></li>}<li class="nav-item"><a class="nav-link" routerLink="/settings"><i class="fas fa-cog me-1"></i> Settings</a></li>
         <li class="nav-item" *ngIf="(user$ | async)?.role === 'admin'">
           <a class="nav-link" routerLink="/admin"><i class="fas fa-shield-alt me-1"></i> Admin</a>
         </li>
@@ -81,6 +79,51 @@
             </div>
 
             <h4 class="mb-1 mt-3">{{ user.fullName || user.username || user.email }}</h4>
+          </div>
+
+          <hr>
+
+          <!-- User Report Statistics -->
+          <div class="mb-4" *ngIf="user.role !== 'admin'">
+            <h5 class="fw-bold mb-3"><i class="fas fa-chart-bar me-2 text-success"></i>My Reports Statistics</h5>
+            <div class="row g-3">
+              <div class="col-6 col-md-3">
+                <div class="card border-0 bg-light text-center">
+                  <div class="card-body py-3">
+                    <i class="fas fa-file-alt text-primary fa-2x mb-2"></i>
+                    <h4 class="fw-bold mb-0">{{ totalUserReports$ | async }}</h4>
+                    <p class="text-muted mb-0 small">Total</p>
+                  </div>
+                </div>
+              </div>
+              <div class="col-6 col-md-3">
+                <div class="card border-0 bg-light text-center">
+                  <div class="card-body py-3">
+                    <i class="fas fa-clock text-warning fa-2x mb-2"></i>
+                    <h4 class="fw-bold mb-0">{{ pendingUserReports$ | async }}</h4>
+                    <p class="text-muted mb-0 small">Pending</p>
+                  </div>
+                </div>
+              </div>
+              <div class="col-6 col-md-3">
+                <div class="card border-0 bg-light text-center">
+                  <div class="card-body py-3">
+                    <i class="fas fa-spinner text-info fa-2x mb-2"></i>
+                    <h4 class="fw-bold mb-0">{{ inProgressUserReports$ | async }}</h4>
+                    <p class="text-muted mb-0 small">In Progress</p>
+                  </div>
+                </div>
+              </div>
+              <div class="col-6 col-md-3">
+                <div class="card border-0 bg-light text-center">
+                  <div class="card-body py-3">
+                    <i class="fas fa-check-circle text-success fa-2x mb-2"></i>
+                    <h4 class="fw-bold mb-0">{{ resolvedUserReports$ | async }}</h4>
+                    <p class="text-muted mb-0 small">Resolved</p>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
           <hr>

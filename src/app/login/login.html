@@ -38,24 +38,6 @@
           </form>
         </div>
       </div>
-
-      <!-- Language Selector -->
-      <div class="text-center mt-3">
-        <div class="btn-group btn-group-sm" role="group">
-          <button type="button" 
-                  class="btn btn-outline-secondary" 
-                  [class.active]="translationService.language() === 'english'"
-                  (click)="setLanguage('english')">
-            English
-          </button>
-          <button type="button" 
-                  class="btn btn-outline-secondary" 
-                  [class.active]="translationService.language() === 'filipino'"
-                  (click)="setLanguage('filipino')">
-            Filipino
-          </button>
-        </div>
-      </div>
     </div>
   </div>
 </div>

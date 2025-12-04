@@ -1,7 +1,9 @@
 import { Component, OnInit } from '@angular/core';
 import { AuthService, AppUser } from '../services/auth-guard';
 import { BarangaysService } from '../services/barangays.service';
-import { Observable } from 'rxjs';
+import { ReportsService } from '../services/reports';
+import { Report } from '../interfaces';
+import { Observable, of } from 'rxjs';
 import { map, switchMap } from 'rxjs/operators';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
@@ -20,10 +22,17 @@ export class Profile implements OnInit {
   uploadingImage = false;
   currentUser: AppUser | null = null;
 
+  // User report statistics
+  totalUserReports$!: Observable<number>;
+  pendingUserReports$!: Observable<number>;
+  inProgressUserReports$!: Observable<number>;
+  resolvedUserReports$!: Observable<number>;
+
   constructor(
     private auth: AuthService,
     private router: Router,
     private barangaysService: BarangaysService,
+    private reportsService: ReportsService,
     private storage: Storage,
     private firestore: Firestore
   ) {
@@ -48,6 +57,32 @@ export class Profile implements OnInit {
           })
         );
       })
+    );
+
+    // Calculate user's report statistics
+    const userReports$: Observable<Report[]> = this.user$.pipe(
+      switchMap(user => {
+        if (!user) return of([]);
+        return this.reportsService.getAllReports().pipe(
+          map(reports => reports.filter(r => (r as any).reporterId === user.uid))
+        );
+      })
+    );
+
+    this.totalUserReports$ = userReports$.pipe(
+      map(reports => reports.length)
+    );
+
+    this.pendingUserReports$ = userReports$.pipe(
+      map(reports => reports.filter(r => r.status === 'Pending').length)
+    );
+
+    this.inProgressUserReports$ = userReports$.pipe(
+      map(reports => reports.filter(r => r.status === 'In Progress').length)
+    );
+
+    this.resolvedUserReports$ = userReports$.pipe(
+      map(reports => reports.filter(r => r.status === 'Done').length)
     );
   }
 

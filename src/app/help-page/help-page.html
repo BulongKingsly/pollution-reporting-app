@@ -16,14 +16,25 @@
           <a class="nav-link" routerLink="/home">
             <i class="fas fa-home me-1"></i> Home
           </a>
-        </li>@if ((user$ | async)?.role !== 'admin') {<li class="nav-item">
+        </li>
+        <li class="nav-item">
           <a class="nav-link active">
             <i class="fas fa-question-circle me-1"></i> Help
           </a>
-        </li>}<li class="nav-item ms-lg-3">
+        </li>
+        <li class="nav-item" *ngIf="user$ | async as user">
+          <a class="nav-link" routerLink="/settings">
+            <i class="fas fa-cog me-1"></i> Settings
+          </a>
+        </li>
+        <li class="nav-item" *ngIf="(user$ | async)?.role === 'admin'">
+          <a class="nav-link" routerLink="/admin">
+            <i class="fas fa-shield-alt me-1"></i> Admin
+          </a>
+        </li>
+        <li class="nav-item ms-lg-3" *ngIf="user$ | async">
           <a class="btn btn-success" routerLink="/submit-report"><i class="fas fa-plus me-1"></i> New Report</a>
         </li>
-
         <li class="nav-item dropdown ms-lg-2" *ngIf="user$ | async as user">
           <a class="nav-link dropdown-toggle d-flex align-items-center" role="button" data-bs-toggle="dropdown" title="User menu" aria-label="User menu">
             <img *ngIf="user.profilePictureUrl; else userIcon"
@@ -38,13 +49,16 @@
               </div>
             </ng-template>
           </a>
-
           <ul class="dropdown-menu dropdown-menu-end">
             <li><a class="dropdown-item" routerLink="/profile"><i class="fas fa-user me-2"></i>My Profile</a></li>
             <li><a class="dropdown-item" routerLink="/settings"><i class="fas fa-cog me-2"></i>Settings</a></li>
             <li><hr class="dropdown-divider"></li>
             <li><a class="dropdown-item text-danger" (click)="logout()"><i class="fas fa-sign-out-alt me-2"></i>Logout</a></li>
           </ul>
+        </li>
+        <!-- Not logged in - show login button -->
+        <li class="nav-item ms-lg-3" *ngIf="!(user$ | async)">
+          <a class="btn btn-success" routerLink="/login"><i class="fas fa-sign-in-alt me-1"></i> Login</a>
         </li>
       </ul>
     </div>
