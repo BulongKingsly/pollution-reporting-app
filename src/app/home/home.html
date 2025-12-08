@@ -194,18 +194,23 @@
               <div *ngFor="let announcement of announcements; let i = index"
                    class="carousel-item"
                    [class.active]="i === 0">
-                <div class="card border-0 shadow-sm border-start border-4 border-info">
-                  <div class="card-body d-flex align-items-start">
-                    <i class="fas fa-bullhorn text-info fa-2x me-3"></i>
-                    <div class="flex-grow-1">
-                      <h5 class="card-title fw-bold mb-2">
-                        <i class="fas fa-star text-warning me-1"></i> {{ announcement.title }}
-                      </h5>
-                      <h6 class="fw-semibold">{{ announcement.subtitle }}</h6>
-                      <p class="card-text text-muted mb-2">{{ announcement.description }}</p>
-                      <small class="text-muted">
-                        Posted {{ formatTimestamp(announcement.createdAt) ? (formatTimestamp(announcement.createdAt) | date:'short') : 'just now' }} • {{ announcement.location }}
-                      </small>
+                <div class="card border-0 shadow-sm announcement-card">
+                  <div class="card-header announcement-header d-flex align-items-center py-2 px-3">
+                    <i class="fas fa-bullhorn me-2"></i>
+                    <span class="fw-semibold">Announcement</span>
+                  </div>
+                  <div class="card-body">
+                    <h5 class="card-title fw-bold mb-1">
+                      <i class="fas fa-star text-warning me-1"></i> {{ announcement.title }}
+                    </h5>
+                    <h6 class="fw-semibold text-muted mb-2">{{ announcement.subtitle }}</h6>
+                    <p class="card-text mb-2">{{ announcement.description }}</p>
+                    <div class="d-flex align-items-center text-muted small">
+                      <i class="fas fa-clock me-1"></i>
+                      <span>{{ formatTimestamp(announcement.createdAt) ? (formatTimestamp(announcement.createdAt) | date:'short') : 'just now' }}</span>
+                      <span class="mx-2">•</span>
+                      <i class="fas fa-map-marker-alt me-1"></i>
+                      <span>{{ announcement.location }}</span>
                     </div>
                   </div>
                 </div>
@@ -214,21 +219,19 @@
 
             <!-- Carousel Controls -->
             <button *ngIf="announcements.length > 1"
-                    class="carousel-control-prev"
+                    class="carousel-control-prev carousel-nav-btn"
                     type="button"
                     data-bs-target="#announcementsCarousel"
-                    data-bs-slide="prev"
-                    style="width: 5%; left: -5%;">
-              <span class="carousel-control-prev-icon bg-dark rounded-circle p-3" aria-hidden="true"></span>
+                    data-bs-slide="prev">
+              <span class="carousel-control-prev-icon bg-dark rounded-circle p-2" aria-hidden="true"></span>
               <span class="visually-hidden">Previous</span>
             </button>
             <button *ngIf="announcements.length > 1"
-                    class="carousel-control-next"
+                    class="carousel-control-next carousel-nav-btn"
                     type="button"
                     data-bs-target="#announcementsCarousel"
-                    data-bs-slide="next"
-                    style="width: 5%; right: -5%;">
-              <span class="carousel-control-next-icon bg-dark rounded-circle p-3" aria-hidden="true"></span>
+                    data-bs-slide="next">
+              <span class="carousel-control-next-icon bg-dark rounded-circle p-2" aria-hidden="true"></span>
               <span class="visually-hidden">Next</span>
             </button>
           </div>
