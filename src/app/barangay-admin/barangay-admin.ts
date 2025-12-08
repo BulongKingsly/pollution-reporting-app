@@ -9,6 +9,7 @@ import { AnnouncementsService } from '../services/announcements';
 import { AuthService } from '../services/auth-guard';
 import { AppUser, Report } from '../interfaces';
 import { Observable } from 'rxjs';
+import { NotificationService } from '../services/notification.service';
 
 @Component({
   selector: 'app-barangay-admin',
@@ -35,16 +36,13 @@ export class BarangayAdminComponent implements OnInit {
     private reportsService: ReportsService,
     private usersService: UsersService,
     private announcementsService: AnnouncementsService,
-    private auth: AuthService
+    private auth: AuthService,
+    private notify: NotificationService
   ) {}
 
-  // simple toasts and confirm dialog handlers (local to this component)
+  // simple toasts handlers (local to this component)
   toasts: Array<{ id: number; message: string; type: 'info' | 'success' | 'warning' | 'danger' }> = [];
   private nextToastId = 1;
-
-  confirmVisible = false;
-  confirmMessage = '';
-  private confirmResolve: ((v: boolean) => void) | null = null;
 
   showToast(message: string, type: 'info' | 'success' | 'warning' | 'danger' = 'info') {
     const id = this.nextToastId++;
@@ -53,18 +51,6 @@ export class BarangayAdminComponent implements OnInit {
   }
 
   removeToast(id: number) { this.toasts = this.toasts.filter(t => t.id !== id); }
-
-  showConfirm(message: string): Promise<boolean> {
-    this.confirmMessage = message;
-    this.confirmVisible = true;
-    return new Promise(resolve => { this.confirmResolve = resolve; });
-  }
-
-  onConfirmAnswer(answer: boolean) {
-    this.confirmVisible = false;
-    if (this.confirmResolve) this.confirmResolve(answer);
-    this.confirmResolve = null;
-  }
 
   ngOnInit(): void {
     this.barangayId = this.route.snapshot.paramMap.get('barangayId');
@@ -151,7 +137,7 @@ export class BarangayAdminComponent implements OnInit {
 
   async suspendUser(user: AppUser) {
     if (!user?.uid) return;
-    const ok = await this.showConfirm('Suspend this user?');
+    const ok = await this.notify.confirm('Suspend this user?', 'Suspend User', 'Yes, Suspend', 'Cancel');
     if (!ok) return;
     try {
       await this.usersService.suspendUser(user.uid);

@@ -11,25 +11,39 @@
           </div>
 
           <!-- Error Message -->
-          <div *ngIf="errorMessage" class="alert alert-danger">{{ errorMessage }}</div>
+          @if (errorMessage) {
+            <div class="alert alert-danger">{{ errorMessage }}</div>
+          }
+
+          <!-- Success Message -->
+          @if (successMessage) {
+            <div class="alert alert-success">{{ successMessage }}</div>
+          }
 
           <!-- Login Form -->
           <form (ngSubmit)="onLogin()" #loginForm="ngForm">
             <div class="mb-3">
               <label class="form-label fw-medium">Email / Username</label>
-              <input type="text" class="form-control form-control-lg" [(ngModel)]="emailOrUsername" name="emailOrUsername" placeholder="Enter your email or username" required>
+              <input type="text" class="form-control form-control-lg" [(ngModel)]="emailOrUsername" name="emailOrUsername" placeholder="Email or username" required>
             </div>
 
             <div class="mb-3">
               <label class="form-label fw-medium">Password</label>
-              <input type="password" class="form-control form-control-lg" [(ngModel)]="password" name="password" placeholder="Enter your password" required>
+              <input type="password" class="form-control form-control-lg" [(ngModel)]="password" name="password" placeholder="Password" required>
             </div>
 
             <div class="mb-3 text-end">
               <a routerLink="/reset-password" class="text-decoration-none small">Reset password</a>
             </div>
 
-            <button type="submit" class="btn btn-success btn-lg w-100 mb-3">Log In</button>
+            <button type="submit" class="btn btn-success btn-lg w-100 mb-3" [disabled]="isLoading">
+              @if (isLoading) {
+                <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                Logging in...
+              } @else {
+                Log In
+              }
+            </button>
 
             <div class="text-center">
               <span class="text-muted small">Don't have an account?</span>

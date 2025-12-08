@@ -7,19 +7,23 @@
   </div>
 
   <!-- Barangay Selector for Main Admin -->
-  <div *ngIf="isMainAdmin" class="card mb-3">
-    <div class="card-body">
-      <div class="row align-items-center">
-        <div class="col-md-6">
-          <label class="form-label fw-medium">Select Barangay</label>
-          <select class="form-select" [(ngModel)]="selectedBarangay" (change)="onBarangayChange()">
-            <option value="">All Barangays</option>
-            <option *ngFor="let b of (barangays$ | async)" [value]="b.id">{{ b.name }}</option>
-          </select>
+  @if (isMainAdmin) {
+    <div class="card mb-3">
+      <div class="card-body">
+        <div class="row align-items-center">
+          <div class="col-md-6">
+            <label class="form-label fw-medium" for="barangaySelect">Select Barangay</label>
+            <select id="barangaySelect" class="form-select" [(ngModel)]="selectedBarangay" (change)="onBarangayChange()" title="Select a barangay to filter analytics">
+              <option value="">All Barangays</option>
+              @for (b of (barangays$ | async); track b.id) {
+                <option [value]="b.id">{{ b.name }}</option>
+              }
+            </select>
+          </div>
         </div>
       </div>
     </div>
-  </div>
+  }
 
   <div class="row g-3">
     <div class="col-md-3">
@@ -31,14 +35,16 @@
       </div>
     </div>
 
-    <div class="col-md-3" *ngFor="let t of pollutionTypes">
-      <div class="card stat-card">
-        <div class="card-body text-center">
-          <h4>{{ countsByType[t] || 0 }}</h4>
-          <small class="text-muted">{{ t | titlecase }}</small>
+    @for (t of pollutionTypes; track t) {
+      <div class="col-md-3">
+        <div class="card stat-card">
+          <div class="card-body text-center">
+            <h4>{{ countsByType[t] || 0 }}</h4>
+            <small class="text-muted">{{ t | titlecase }}</small>
+          </div>
         </div>
       </div>
-    </div>
+    }
   </div>
   <div class="card mt-4">
     <div class="card-body">

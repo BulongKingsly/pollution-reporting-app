@@ -1,0 +1,46 @@
+/* Notification badge styles */
+.notification-badge {
+  font-size: 0.65rem;
+  padding: 0.25em 0.5em;
+  min-width: 1.2rem;
+}
+
+/* Profile image styles */
+.profile-img {
+  width: 32px;
+  height: 32px;
+  object-fit: cover;
+  border: 2px solid #198754;
+}
+
+/* Profile icon placeholder */
+.profile-icon-placeholder {
+  width: 32px;
+  height: 32px;
+  font-size: 0.9rem;
+}
+
+/* Active nav link */
+.nav-link.active {
+  font-weight: 600;
+  color: #198754 !important;
+}
+
+/* Bell icon hover effect */
+.nav-link:hover .fa-bell {
+  color: #198754;
+}
+
+/* Dropdown menu styling */
+.dropdown-menu {
+  border: none;
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+}
+
+.dropdown-item:hover {
+  background-color: #f8f9fa;
+}
+
+.dropdown-item.text-danger:hover {
+  background-color: #f8d7da;
+}

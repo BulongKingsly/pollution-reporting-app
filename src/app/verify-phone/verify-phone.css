@@ -1,0 +1,52 @@
+.letter-spacing-wide {
+  letter-spacing: 0.5em;
+  font-size: 1.5rem;
+  font-weight: bold;
+}
+
+.card {
+  overflow: hidden;
+}
+
+.card-header i {
+  opacity: 0.9;
+}
+
+.form-control:focus {
+  border-color: #198754;
+  box-shadow: 0 0 0 0.25rem rgba(25, 135, 84, 0.25);
+}
+
+.btn-success {
+  background-color: #198754;
+  border-color: #198754;
+}
+
+.btn-success:hover:not(:disabled) {
+  background-color: #157347;
+  border-color: #146c43;
+}
+
+.btn-success:disabled {
+  opacity: 0.65;
+}
+
+.alert {
+  border-radius: 0.5rem;
+}
+
+/* Animation for verified state */
+.fa-check-circle {
+  animation: scaleIn 0.3s ease-out;
+}
+
+@keyframes scaleIn {
+  from {
+    transform: scale(0);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}

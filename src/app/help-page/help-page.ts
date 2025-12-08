@@ -1,15 +1,17 @@
 import { Component, OnInit } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { AuthService, AppUser } from '../services/auth-guard';
 import { UsersService } from '../services/users.service';
 import { BarangaysService } from '../services/barangays.service';
+import { NotificationsService } from '../services/notifications.service';
+import { ReportsService } from '../services/reports';
 import { Observable, of } from 'rxjs';
 import { map, switchMap } from 'rxjs/operators';
 import { CommonModule } from '@angular/common';
 
 @Component({
   selector: 'app-help-page',
-  imports: [RouterLink, CommonModule],
+  imports: [RouterLink, RouterLinkActive, CommonModule],
   templateUrl: './help-page.html',
   styleUrl: './help-page.css',
 })
@@ -19,13 +21,35 @@ export class HelpPage implements OnInit {
   barangayAdminEmail$: Observable<string> = of('barangay@admin.gov.ph');
   barangayAdminContact$: Observable<string> = of('(02) 1234-5678');
 
+  // Unread notifications count
+  unreadNotificationCount = 0;
+
+  // Admin pending approval count
+  adminPendingApprovalCount = 0;
+
   constructor(
     private auth: AuthService,
     private router: Router,
     private usersService: UsersService,
-    private barangaysService: BarangaysService
+    private barangaysService: BarangaysService,
+    private notificationsService: NotificationsService,
+    private reportsService: ReportsService
   ) {
     this.user$ = this.auth.user$;
+    // Load unread notification count
+    this.user$.pipe(
+      switchMap(user => user ? this.notificationsService.getUnreadCount(user.uid) : of(0))
+    ).subscribe(count => this.unreadNotificationCount = count);
+
+    // Load admin pending approval count (for admin badge in navbar)
+    this.user$.pipe(
+      switchMap(user => {
+        if (!user || user.role !== 'admin') return of(0);
+        return this.reportsService.getAllReports().pipe(
+          map(reports => reports.filter(r => r.approved === false || r.approved === undefined || r.approved === null).length)
+        );
+      })
+    ).subscribe(count => this.adminPendingApprovalCount = count);
   }
 
   ngOnInit(): void {

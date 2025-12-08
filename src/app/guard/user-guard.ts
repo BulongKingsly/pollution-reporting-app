@@ -17,7 +17,7 @@ export const UserGuard: CanActivateFn = () => {
         return true;
       }
       // Redirect admins to home
-      router.navigate(['/home']);
+      router.navigate(['/']);
       return false;
     })
   );

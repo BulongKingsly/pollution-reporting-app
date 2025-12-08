@@ -7,14 +7,16 @@ import { Observable, of } from 'rxjs';
 import { map, switchMap } from 'rxjs/operators';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
-import { RouterLink, Router } from '@angular/router';
+import { RouterLink, Router, RouterLinkActive } from '@angular/router';
 import { Storage, ref, uploadBytes, getDownloadURL } from '@angular/fire/storage';
 import { Firestore, doc, updateDoc } from '@angular/fire/firestore';
+import { NotificationService } from '../services/notification.service';
+import { NotificationsService } from '../services/notifications.service';
 
 @Component({
   selector: 'app-profile',
   templateUrl: './profile.html',
-  imports: [FormsModule, CommonModule, RouterLink]
+  imports: [FormsModule, CommonModule, RouterLink, RouterLinkActive]
 })
 export class Profile implements OnInit {
   user$: Observable<AppUser | null>;
@@ -28,15 +30,27 @@ export class Profile implements OnInit {
   inProgressUserReports$!: Observable<number>;
   resolvedUserReports$!: Observable<number>;
 
+  // Unread notifications count
+  unreadNotificationCount = 0;
+
+  // Admin pending approval count
+  adminPendingApprovalCount = 0;
+
   constructor(
     private auth: AuthService,
     private router: Router,
     private barangaysService: BarangaysService,
     private reportsService: ReportsService,
     private storage: Storage,
-    private firestore: Firestore
+    private firestore: Firestore,
+    private notify: NotificationService,
+    private notificationsService: NotificationsService
   ) {
     this.user$ = this.auth.user$;
+    // Load unread notification count
+    this.user$.pipe(
+      switchMap(user => user ? this.notificationsService.getUnreadCount(user.uid) : of(0))
+    ).subscribe(count => this.unreadNotificationCount = count);
   }
 
   ngOnInit(): void {
@@ -73,17 +87,30 @@ export class Profile implements OnInit {
       map(reports => reports.length)
     );
 
+    // Pending = not yet approved by admin
     this.pendingUserReports$ = userReports$.pipe(
-      map(reports => reports.filter(r => r.status === 'Pending').length)
+      map(reports => reports.filter(r => !r.approved).length)
     );
 
+    // In Progress = approved and being worked on
     this.inProgressUserReports$ = userReports$.pipe(
-      map(reports => reports.filter(r => r.status === 'In Progress').length)
+      map(reports => reports.filter(r => r.approved && r.status === 'In Progress').length)
     );
 
+    // Resolved = marked as Done
     this.resolvedUserReports$ = userReports$.pipe(
       map(reports => reports.filter(r => r.status === 'Done').length)
     );
+
+    // Load admin pending approval count (for admin badge in navbar)
+    this.user$.pipe(
+      switchMap(user => {
+        if (!user || user.role !== 'admin') return of(0);
+        return this.reportsService.getAllReports().pipe(
+          map(reports => reports.filter(r => r.approved === false || r.approved === undefined || r.approved === null).length)
+        );
+      })
+    ).subscribe(count => this.adminPendingApprovalCount = count);
   }
 
   async onProfilePictureChange(event: Event) {
@@ -94,13 +121,13 @@ export class Profile implements OnInit {
 
     // Validate file type
     if (!file.type.startsWith('image/')) {
-      alert('Please select an image file');
+      this.notify.warning('Please select an image file', 'Invalid File');
       return;
     }
 
     // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      alert('Image size should be less than 5MB');
+      this.notify.warning('Image size should be less than 5MB', 'File Too Large');
       return;
     }
 
@@ -125,11 +152,11 @@ export class Profile implements OnInit {
       });
 
       this.uploadingImage = false;
-      alert('Profile picture updated successfully!');
+      this.notify.success('Profile picture updated successfully!', 'Success');
     } catch (error) {
       console.error('Error uploading profile picture:', error);
       this.uploadingImage = false;
-      alert('Failed to upload profile picture. Please try again.');
+      this.notify.error('Failed to upload profile picture. Please try again.', 'Upload Failed');
     }
   }
 

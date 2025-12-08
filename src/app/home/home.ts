@@ -1,14 +1,16 @@
-import { Component, AfterViewInit, ChangeDetectionStrategy, signal, computed } from '@angular/core';
+import { Component, AfterViewInit, ChangeDetectionStrategy, signal, computed, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Observable, of, switchMap, combineLatest, map, take } from 'rxjs';
-import { Router, RouterLink } from '@angular/router';
+import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { UsersService } from '../services/users';
 import { AppUser, Report, Announcement } from '../interfaces';
 import { AuthService } from '../services/auth-guard';
 import { ReportsService } from '../services/reports';
 import { AnnouncementsService } from '../services/announcements';
+import { NotificationService } from '../services/notification.service';
+import { NotificationsService } from '../services/notifications.service';
 import * as L from 'leaflet';
 
 interface EnrichedReport extends Report {
@@ -21,10 +23,10 @@ interface EnrichedReport extends Report {
   selector: 'app-home',
   templateUrl: './home.html',
   styleUrls: ['./home.css'],
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [CommonModule, FormsModule, RouterLink, RouterLinkActive],
   changeDetection: ChangeDetectionStrategy.OnPush
 })
-export class Home implements AfterViewInit {
+export class Home implements AfterViewInit, OnDestroy {
   // Signals for reactive state
   searchTerm = signal('');
   selectedFilter = signal('Latest');
@@ -44,6 +46,15 @@ export class Home implements AfterViewInit {
   private baseReports$: Observable<EnrichedReport[]>;
   private reports!: ReturnType<typeof toSignal<EnrichedReport[]>>;
   private usersMap = new Map<string, AppUser>();
+
+  // All reports for admin statistics (including unapproved)
+  private allReports!: ReturnType<typeof toSignal<Report[]>>;
+
+  // Computed signal to check if current user is an admin (main admin or barangay admin)
+  isAdmin = computed(() => {
+    const user = this.user();
+    return user?.role === 'admin';
+  });
 
   // Filtered reports as computed signal
   filteredReports = computed(() => {
@@ -94,22 +105,49 @@ export class Home implements AfterViewInit {
   pendingReports = computed(() => this.reports().filter(r => r.status === 'Pending').length);
   resolvedReports = computed(() => this.reports().filter(r => r.status === 'Done').length);
 
+  // Admin statistics (for statistics cards on home page)
+  adminTotalReports = computed(() => this.allReports().filter(r => r.approved === true).length);
+  adminPendingApprovalCount = computed(() => this.allReports().filter(r => r.approved === false || r.approved === undefined || r.approved === null).length);
+  adminInProgressCount = computed(() => this.allReports().filter(r => r.approved === true && r.status === 'In Progress').length);
+  adminDoneCount = computed(() => this.allReports().filter(r => r.approved === true && r.status === 'Done').length);
+
   // Map tracking
   private maps: { [reportId: string]: L.Map } = {};
+
+  // Unread notifications count
+  unreadNotificationCount = signal(0);
 
   constructor(
     private authService: AuthService,
     private reportsService: ReportsService,
     private announcementsService: AnnouncementsService,
     private usersService: UsersService,
-    private router: Router
+    private router: Router,
+    private notify: NotificationService,
+    private notificationsService: NotificationsService
   ) {
     this.user$ = this.authService.user$;
 
     // Initialize signals that depend on services
     this.user = toSignal(this.authService.user$, { initialValue: null });
     this.baseReports$ = this.getEnrichedReports();
-    this.reports = toSignal(this.baseReports$, { initialValue: [] });    // Load announcements
+    this.reports = toSignal(this.baseReports$, { initialValue: [] });
+
+    // Initialize all reports for admin statistics (including unapproved)
+    const allReports$ = this.user$.pipe(
+      switchMap(user => {
+        if (!user || user.role !== 'admin') return of([]);
+        const isMainAdmin = user.role === 'admin' && (!user.barangay || user.barangay === '');
+        return isMainAdmin
+          ? this.reportsService.getAllReports()
+          : user.barangay
+          ? this.reportsService.getReportsByBarangay(user.barangay)
+          : of([]);
+      })
+    );
+    this.allReports = toSignal(allReports$, { initialValue: [] });
+
+    // Load announcements
     this.announcements$ = this.user$.pipe(
       switchMap(user => {
         if (!user) return of([]);
@@ -120,6 +158,11 @@ export class Home implements AfterViewInit {
         return this.announcementsService.getAnnouncementsForBarangay(user?.barangay || null);
       })
     );
+
+    // Load unread notification count
+    this.user$.pipe(
+      switchMap(user => user ? this.notificationsService.getUnreadCount(user.uid) : of(0))
+    ).subscribe(count => this.unreadNotificationCount.set(count));
 
     // Listen to scroll events
     window.addEventListener('scroll', this.handleScroll);
@@ -221,26 +264,28 @@ export class Home implements AfterViewInit {
 
     const user = this.user();
     if (!user) {
-      alert('Please login to upvote reports');
+      this.notify.warning('Please login to upvote reports', 'Login Required');
       this.router.navigate(['/login']);
       return;
     }
 
     if (user.role === 'admin') {
-      alert('Admins cannot upvote reports');
+      this.notify.info('Admins cannot upvote reports', 'Not Allowed');
       return;
     }
 
     const upvotedBy = report.upvotedBy || [];
     if (upvotedBy.includes(user.uid)) {
-      alert('You have already upvoted this report');
+      this.notify.info('You have already upvoted this report', 'Already Upvoted');
       return;
     }
 
     try {
       await this.reportsService.upvoteReport(report.id, user.uid);
+      this.notify.success('Report upvoted!', 'Success');
     } catch (err) {
       console.error('Failed to upvote', err);
+      this.notify.error('Failed to upvote report', 'Error');
     }
   }
 
@@ -313,20 +358,20 @@ export class Home implements AfterViewInit {
   async addComment(reportId: string): Promise<void> {
     const user = this.user();
     if (!user) {
-      alert('Please login to add comments');
+      this.notify.warning('Please login to add comments', 'Login Required');
       this.router.navigate(['/login']);
       return;
     }
 
     if (user.role !== 'admin') {
-      alert('Only admins can add comments');
+      this.notify.info('Only admins can add comments', 'Not Allowed');
       return;
     }
 
     const texts = this.commentTexts();
     const commentText = texts[reportId]?.trim();
     if (!commentText) {
-      alert('Please enter a comment');
+      this.notify.warning('Please enter a comment', 'Empty Comment');
       return;
     }
 
@@ -344,10 +389,10 @@ export class Home implements AfterViewInit {
       delete updatedTexts[reportId];
       this.commentTexts.set(updatedTexts);
 
-      alert('Comment added successfully');
+      this.notify.success('Comment added successfully', 'Success');
     } catch (err) {
       console.error('Failed to add comment', err);
-      alert('Failed to add comment');
+      this.notify.error('Failed to add comment', 'Error');
     }
   }
 
@@ -396,4 +441,8 @@ export class Home implements AfterViewInit {
   handleScroll = () => {
     this.showGoToTop.set(window.scrollY > 300);
   };
+
+  ngOnDestroy() {
+    window.removeEventListener('scroll', this.handleScroll);
+  }
 }

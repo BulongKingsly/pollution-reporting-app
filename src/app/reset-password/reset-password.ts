@@ -1,7 +1,8 @@
 import { Component } from '@angular/core';
 import { AuthService } from '../services/auth-guard';
-import { Auth, sendPasswordResetEmail } from '@angular/fire/auth';
+import { Auth } from '@angular/fire/auth';
 import { Firestore, collection, addDoc, serverTimestamp } from '@angular/fire/firestore';
+import { Functions, httpsCallable } from '@angular/fire/functions';
 import { RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
@@ -22,7 +23,8 @@ export class ResetPassword {
 
   constructor(
     private auth: Auth,
-    private firestore: Firestore
+    private firestore: Firestore,
+    private functions: Functions
   ) {}
 
   // Email validation
@@ -89,36 +91,45 @@ export class ResetPassword {
     this.isLoading = true;
 
     try {
-      // Send password reset email via Firebase
+      // Send password reset email via our custom Cloud Function
       console.log('Attempting to send reset email to:', this.email);
-      await sendPasswordResetEmail(this.auth, this.email);
-      console.log('✅ Firebase sendPasswordResetEmail succeeded');
+      const sendResetEmail = httpsCallable(this.functions, 'sendCustomPasswordResetEmail');
+      const result = await sendResetEmail({ email: this.email });
+      const data = result.data as any;
 
-      // Log success to Firestore
-      await this.logResetRequest(this.email, 'sent');
+      if (data.success) {
+        console.log('✅ Password reset email sent successfully');
 
-      // Show success message
-      this.message = 'A password reset link has been sent to your email. Check your spam folder if the reset link isn\'t in your inbox.';
-      this.email = ''; // Clear email field
+        // Log success to Firestore
+        await this.logResetRequest(this.email, 'sent');
 
-      // Start cooldown
-      this.canSend = false;
-      const interval = setInterval(() => {
-        this.cooldown--;
-        if (this.cooldown <= 0) {
-          this.canSend = true;
-          this.cooldown = 60;
-          clearInterval(interval);
-        }
-      }, 1000);
+        // Show success message
+        this.message = data.message || 'A password reset link has been sent to your email. Check your spam folder if the reset link isn\'t in your inbox.';
+        this.email = ''; // Clear email field
+
+        // Start cooldown
+        this.canSend = false;
+        const interval = setInterval(() => {
+          this.cooldown--;
+          if (this.cooldown <= 0) {
+            this.canSend = true;
+            this.cooldown = 60;
+            clearInterval(interval);
+          }
+        }, 1000);
+      } else {
+        this.errorMessage = data.error || 'Failed to send reset link. Please try again.';
+        this.isInvalidEmail = true;
+        await this.logResetRequest(this.email, 'failed', data.error);
+      }
 
     } catch (error: any) {
-      const friendlyMessage = this.translateFirebaseError(error.code || error.message);
-      this.errorMessage = friendlyMessage;
+      console.error('Reset password error:', error);
+      this.errorMessage = 'Failed to send reset link. Please try again.';
       this.isInvalidEmail = true;
 
       // Log failure to Firestore
-      await this.logResetRequest(this.email, 'failed', error.code || error.message);
+      await this.logResetRequest(this.email, 'failed', error.message);
     } finally {
       this.isLoading = false;
     }

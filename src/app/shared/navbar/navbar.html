@@ -1,0 +1,83 @@
+<!-- Navigation -->
+<nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm sticky-top">
+  <div class="container-fluid">
+    <a class="navbar-brand fw-bold text-success" routerLink="/">
+      <i class="fas fa-leaf me-2"></i>Pollution Report
+    </a>
+
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" title="Toggle navigation menu" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <ul class="navbar-nav ms-auto align-items-center">
+        <li class="nav-item">
+          <a class="nav-link" [class.active]="activePage() === 'home'" routerLink="/">
+            <i class="fas fa-home me-1"></i> Home
+          </a>
+        </li>
+        <li class="nav-item" *ngIf="(user$ | async)?.role !== 'admin'">
+          <a class="nav-link" [class.active]="activePage() === 'help'" routerLink="/help">
+            <i class="fas fa-question-circle me-1"></i> Help
+          </a>
+        </li>
+        <li class="nav-item" *ngIf="user$ | async">
+          <a class="nav-link" [class.active]="activePage() === 'settings'" routerLink="/settings">
+            <i class="fas fa-cog me-1"></i> Settings
+          </a>
+        </li>
+        <li class="nav-item" *ngIf="(user$ | async)?.role === 'admin'">
+          <a class="nav-link" [class.active]="activePage() === 'admin'" routerLink="/admin">
+            <i class="fas fa-shield-alt me-1"></i> Admin
+          </a>
+        </li>
+
+        <!-- Notification Bell -->
+        <li class="nav-item" *ngIf="user$ | async">
+          <a class="nav-link position-relative" [class.active]="activePage() === 'notifications'" routerLink="/notifications" title="Notifications">
+            <i class="fas fa-bell"></i>
+            <span *ngIf="(unreadCount$ | async) as count"
+                  class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger notification-badge">
+              {{ count > 99 ? '99+' : count }}
+              <span class="visually-hidden">unread notifications</span>
+            </span>
+          </a>
+        </li>
+
+        <li class="nav-item ms-lg-3" *ngIf="(user$ | async) && (user$ | async)?.role !== 'admin'">
+          <a class="btn btn-success" routerLink="/submit-report">
+            <i class="fas fa-plus me-1"></i> New Report
+          </a>
+        </li>
+
+        <li class="nav-item dropdown ms-lg-2" *ngIf="user$ | async as user">
+          <a class="nav-link dropdown-toggle d-flex align-items-center" data-bs-toggle="dropdown" role="button">
+            <img *ngIf="user.profilePictureUrl; else userIcon"
+                 [src]="user.profilePictureUrl"
+                 alt="Profile"
+                 class="rounded-circle profile-img">
+            <ng-template #userIcon>
+              <div class="rounded-circle bg-success text-white d-flex align-items-center justify-content-center profile-icon-placeholder">
+                {{ (user.fullName || user.email || 'U').charAt(0).toUpperCase() }}
+              </div>
+            </ng-template>
+          </a>
+          <ul class="dropdown-menu dropdown-menu-end">
+            <li><a class="dropdown-item" routerLink="/profile"><i class="fas fa-user me-2"></i>My Profile</a></li>
+            <li><a class="dropdown-item" routerLink="/notifications"><i class="fas fa-bell me-2"></i>Notifications</a></li>
+            <li><a class="dropdown-item" routerLink="/settings"><i class="fas fa-cog me-2"></i>Settings</a></li>
+            <li><hr class="dropdown-divider"></li>
+            <li><a class="dropdown-item text-danger" (click)="logout()" role="button"><i class="fas fa-sign-out-alt me-2"></i>Logout</a></li>
+          </ul>
+        </li>
+
+        <!-- Not logged in - show login button -->
+        <li class="nav-item ms-lg-3" *ngIf="!(user$ | async)">
+          <a class="btn btn-success" routerLink="/login">
+            <i class="fas fa-sign-in-alt me-1"></i> Login
+          </a>
+        </li>
+      </ul>
+    </div>
+  </div>
+</nav>

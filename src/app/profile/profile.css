@@ -1,0 +1,111 @@
+/* Notification Badge */
+.notification-badge {
+  font-size: 0.65rem;
+  padding: 0.25em 0.5em;
+  min-width: 1.2rem;
+}
+
+/* Mobile nav badge */
+.mobile-badge {
+  font-size: 0.55rem;
+  padding: 0.15em 0.35em;
+  min-width: 1rem;
+}
+
+/* Profile notification badge */
+.profile-notification-badge {
+  font-size: 0.55rem;
+  padding: 0.2em 0.4em;
+  min-width: 1rem;
+  transform: translate(-50%, -25%) !important;
+}
+
+/* ===== MOBILE RESPONSIVE ===== */
+@media (max-width: 575.98px) {
+  /* Profile header */
+  .profile-header {
+    padding: 1.5rem 1rem !important;
+  }
+
+  .profile-header .profile-avatar,
+  .profile-header .profile-avatar-placeholder {
+    width: 80px !important;
+    height: 80px !important;
+    font-size: 2rem !important;
+  }
+
+  .profile-header h3 {
+    font-size: 1.25rem;
+  }
+
+  .profile-header .text-white-50 {
+    font-size: 0.85rem;
+  }
+
+  /* Stats row */
+  .profile-stats {
+    gap: 0.5rem;
+  }
+
+  .profile-stats .col {
+    padding: 0.5rem;
+  }
+
+  .profile-stats h4 {
+    font-size: 1.1rem;
+    margin-bottom: 0;
+  }
+
+  .profile-stats small {
+    font-size: 0.7rem;
+  }
+
+  /* Cards */
+  .card-header {
+    padding: 0.75rem 1rem;
+  }
+
+  .card-header h5 {
+    font-size: 1rem;
+  }
+
+  /* Report list items */
+  .list-group-item {
+    padding: 0.75rem;
+  }
+
+  .list-group-item h6 {
+    font-size: 0.9rem;
+  }
+
+  .list-group-item small {
+    font-size: 0.75rem;
+  }
+
+  /* Edit profile form */
+  .form-label {
+    font-size: 0.875rem;
+  }
+
+  /* Upload area */
+  .upload-area {
+    padding: 1rem;
+  }
+
+  .upload-area i {
+    font-size: 2rem;
+  }
+
+  .upload-area p {
+    font-size: 0.85rem;
+    margin-bottom: 0;
+  }
+}
+
+@media (min-width: 576px) and (max-width: 767.98px) {
+  .profile-header .profile-avatar,
+  .profile-header .profile-avatar-placeholder {
+    width: 90px !important;
+    height: 90px !important;
+  }
+}

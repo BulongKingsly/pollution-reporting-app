@@ -3,7 +3,7 @@ import { Router, RouterLink } from '@angular/router';
 import { AuthService, AppUser } from '../services/auth-guard';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { take } from 'rxjs/operators';
+import { filter, take } from 'rxjs/operators';
 import { TranslationService, Language } from '../services/translation.service';
 
 @Component({
@@ -15,6 +15,8 @@ export class Login {
   emailOrUsername = '';
   password = '';
   errorMessage = '';
+  successMessage = '';
+  isLoading = false;
 
   constructor(
     private auth: AuthService,
@@ -23,24 +25,35 @@ export class Login {
   ) {}
 
   async onLogin() {
+    // Prevent double submission
+    if (this.isLoading) return;
+
     this.errorMessage = '';
+    this.successMessage = '';
+    this.isLoading = true;
 
     try {
       // Sign in with Firebase Auth (supports both email and username)
       await this.auth.login(this.emailOrUsername, this.password);
 
-      // Subscribe once to user$ to get Firestore user and redirect
-      this.auth.user$.pipe(take(1)).subscribe((user: AppUser | null) => {
-        if (!user) return;
-        if (user.role === 'admin') {
-          this.router.navigate(['/admin']);
-        } else {
-          this.router.navigate(['/home']);
-        }
+      // Wait for user data to be available (filter out null values)
+      this.auth.user$.pipe(
+        filter((user): user is AppUser => user !== null),
+        take(1)
+      ).subscribe((user: AppUser) => {
+        this.successMessage = 'Login successful! Redirecting...';
+        setTimeout(() => {
+          if (user.role === 'admin') {
+            this.router.navigate(['/admin']);
+          } else {
+            this.router.navigate(['/']);
+          }
+        }, 500);
       });
 
     } catch (error: any) {
       this.errorMessage = error.message || 'Login failed';
+      this.isLoading = false;
     }
   }
 

@@ -46,9 +46,9 @@ export class AnalyticsComponent implements OnInit {
     // Initialize barangays observable
     this.barangays$ = this.barangaysService.getAllBarangays();
 
-    // Check if we're viewing a specific barangay from route
-    this.route.params.subscribe(params => {
-      const routeBarangayId = params['barangayId'];
+    // Check if we're viewing a specific barangay from route params or query params
+    combineLatest([this.route.params, this.route.queryParams]).subscribe(([params, queryParams]) => {
+      const routeBarangayId = params['barangayId'] || queryParams['barangay'];
 
       this.auth.user$.pipe(
         map(u => {

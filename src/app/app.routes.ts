@@ -15,29 +15,23 @@ import { BarangayAdminGuard } from './guard/barangay-admin-guard';
 import { BarangayAdminComponent } from './barangay-admin/barangay-admin';
 import { AnalyticsComponent } from './analytics/analytics';
 import { UserGuard } from './guard/user-guard';
+import { NotificationsComponent } from './notifications/notifications';
 
 export const routes: Routes = [
-  // Default route.
-  { path: '', redirectTo: 'home', pathMatch: 'full' },
-
-  // Public pages.
+  // Public pages
   { path: 'login', component: Login },
   { path: 'sign-up', component: SignUp },
   { path: 'reset-password', component: ResetPassword },
-  { path: 'home', component: Home },
-  { path: 'help', component: HelpPage, canActivate: [UserGuard] }, // Public but blocked for admins
+  { path: 'help', component: HelpPage, canActivate: [UserGuard] },
 
   // Protected pages (require authentication)
   { path: 'profile', component: Profile, canActivate: [AuthGuard] },
   { path: 'settings', component: SettingsPage, canActivate: [AuthGuard] },
   { path: 'submit-report', component: SubmitReport, canActivate: [AuthGuard] },
-  {
-    path: 'admin',
-    component: AdminDashboard,
-    canActivate: [AuthGuard, AdminGuard]
-  },
+  { path: 'notifications', component: NotificationsComponent, canActivate: [AuthGuard] },
 
-  // Barangay-admin scoped area
+  // Admin routes
+  { path: 'admin', component: AdminDashboard, canActivate: [AuthGuard, AdminGuard] },
   { path: 'admin/barangay/:barangayId', component: BarangayAdminComponent, canActivate: [AuthGuard, BarangayAdminGuard] },
   { path: 'admin/analytics', component: AnalyticsComponent, canActivate: [AuthGuard, AdminGuard] },
   { path: 'admin/barangay/:barangayId/analytics', component: AnalyticsComponent, canActivate: [AuthGuard, BarangayAdminGuard] },
@@ -45,6 +39,9 @@ export const routes: Routes = [
   // Unauthorized
   { path: 'unauthorized', component: UnauthorizedComponent },
 
-  // Unknown route fallback (protected)
-  { path: '**', redirectTo: 'home' }
+  // Home page (default route)
+  { path: '', component: Home, pathMatch: 'full' },
+
+  // Unknown route fallback
+  { path: '**', redirectTo: '' }
 ];

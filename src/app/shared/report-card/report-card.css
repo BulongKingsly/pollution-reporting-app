@@ -1,0 +1,198 @@
+/* Report Card Component Styles */
+
+.report-card {
+  border-radius: 12px;
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.report-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Green Header */
+.report-header {
+  background: linear-gradient(135deg, #198754 0%, #20c997 100%);
+  color: white;
+  padding: 12px 16px;
+}
+
+.pollution-type-badge {
+  font-size: 0.85rem;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-weight: 500;
+}
+
+.status-badge {
+  font-size: 0.8rem;
+  padding: 5px 10px;
+  border-radius: 15px;
+}
+
+/* Reporter Avatar */
+.reporter-avatar {
+  width: 45px;
+  height: 45px;
+  object-fit: cover;
+  border: 2px solid #198754;
+}
+
+.reporter-avatar-placeholder {
+  width: 45px;
+  height: 45px;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+/* Image Gallery - Stack Layout */
+.image-gallery {
+  margin: 0;
+}
+
+.image-stack {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.image-stack-item {
+  position: relative;
+  overflow: hidden;
+  border-radius: 8px;
+  aspect-ratio: 4/3;
+}
+
+.image-stack-item.single {
+  grid-column: span 2;
+  aspect-ratio: 16/9;
+}
+
+.report-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  cursor: pointer;
+  transition: transform 0.3s ease;
+}
+
+.report-image:hover {
+  transform: scale(1.05);
+}
+
+/* Description */
+.report-description {
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: #333;
+}
+
+/* Meta Information */
+.report-meta {
+  background: #f8f9fa;
+  padding: 10px 12px;
+  border-radius: 8px;
+}
+
+/* Upvote Button */
+.upvote-btn {
+  border-radius: 20px;
+  padding: 6px 16px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.upvote-btn:hover:not(:disabled) {
+  background-color: #198754;
+  color: white;
+  transform: translateY(-1px);
+}
+
+.upvote-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Map Container */
+.report-map-container {
+  height: 250px;
+  border-radius: 8px;
+  border: 1px solid #dee2e6;
+  background-color: #f8f9fa;
+}
+
+/* Comments */
+.comment-avatar {
+  width: 32px;
+  height: 32px;
+  object-fit: cover;
+  border: 2px solid #0d6efd;
+}
+
+.comment-avatar-placeholder {
+  width: 32px;
+  height: 32px;
+  font-size: 0.75rem;
+}
+
+.comment-item {
+  border-left: 3px solid #0d6efd;
+}
+
+/* Admin Actions */
+.admin-actions {
+  background: #f8f9fa;
+  padding: 15px;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+}
+
+.add-comment-section textarea {
+  border-radius: 8px;
+  resize: none;
+}
+
+/* Dark Mode Support */
+body.dark-mode .report-card {
+  background-color: #1e1e1e;
+  border-color: #333;
+}
+
+body.dark-mode .report-header {
+  background: linear-gradient(135deg, #22c55e 0%, #10b981 100%);
+}
+
+body.dark-mode .report-description {
+  color: #e0e0e0;
+}
+
+body.dark-mode .report-meta {
+  background: #2d2d2d;
+}
+
+body.dark-mode .comment-item {
+  background-color: #2d2d2d !important;
+}
+
+body.dark-mode .admin-actions {
+  background: #2d2d2d;
+  border-color: #444;
+}
+
+/* Responsive */
+@media (max-width: 576px) {
+  .image-stack {
+    grid-template-columns: 1fr;
+  }
+
+  .image-stack-item.single {
+    grid-column: span 1;
+  }
+
+  .report-header {
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start !important;
+  }
+}

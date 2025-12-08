@@ -4,6 +4,10 @@ export interface AppUser {
   username?: string;  // Unique username
   fullName?: string;  // Full name from sign-up
   contact?: string;  // Contact number
+  phoneNumber?: string;  // Phone number (contact only, no SMS)
+  emailVerified?: boolean;  // Whether email is verified for notifications
+  emailVerificationCode?: string;  // 6-digit verification code
+  emailVerificationExpiry?: any;  // Expiry timestamp for verification code
   address?: string;  // Physical address
   profilePictureUrl?: string;  // Profile picture URL
   role: 'user' | 'admin';
@@ -14,7 +18,13 @@ export interface AppUser {
     language: 'english' | 'filipino';
     textSize: 'small' | 'medium' | 'large';
     theme: 'light' | 'dark';
-    notifications: { email: boolean; announcement: boolean; upvote: boolean };
+    notifications: {
+      email: boolean;
+      announcement: boolean;
+      upvote: boolean;
+      reportStatus: boolean;
+      passwordChange: boolean;
+    };
   };
 }
 
@@ -63,4 +73,19 @@ export interface Report {
   id?: string;
   barangayId?: string;  // Barangay where the report was submitted
   approved?: boolean;  // Whether report is approved by barangay admin
+}
+
+export interface AppNotification {
+  id?: string;
+  userId: string;           // Target user ID
+  type: 'new_report' | 'report_status' | 'report_approved' | 'report_rejected' | 'upvote' | 'comment' | 'announcement' | 'admin_response';
+  title: string;
+  message: string;
+  read: boolean;
+  createdAt: any;
+  reportId?: string;        // Related report ID
+  announcementId?: string;  // Related announcement ID
+  fromUserId?: string;      // User who triggered the notification
+  fromUserName?: string;    // Name of user who triggered
+  barangayId?: string;      // Related barangay
 }

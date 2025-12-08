@@ -1,3 +1,216 @@
+/* Notification Badge */
+.notification-badge {
+  font-size: 0.65rem;
+  padding: 0.25em 0.5em;
+  min-width: 1.2rem;
+}
+
+/* Mobile nav badge */
+.mobile-badge {
+  font-size: 0.55rem;
+  padding: 0.15em 0.35em;
+  min-width: 1rem;
+}
+
+/* Profile notification badge */
+.profile-notification-badge {
+  font-size: 0.55rem;
+  padding: 0.2em 0.4em;
+  min-width: 1rem;
+  transform: translate(-50%, -25%) !important;
+}
+
+/* Report Card Styles - Unified Layout */
+.report-card {
+  border-radius: 12px;
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.report-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Statistics Cards - Admin Overview */
+.stat-card {
+  border-radius: 12px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.stat-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+}
+
+.stat-icon {
+  opacity: 0.9;
+}
+
+/* Green Header */
+.report-header {
+  background: linear-gradient(135deg, #198754 0%, #20c997 100%);
+  color: white;
+  padding: 12px 16px;
+}
+
+.pollution-badge {
+  font-size: 0.85rem;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-weight: 500;
+}
+
+.status-badge {
+  font-size: 0.8rem;
+  padding: 5px 10px;
+  border-radius: 15px;
+}
+
+/* Reporter Avatar in Report Header */
+.report-header .rounded-circle {
+  width: 40px !important;
+  height: 40px !important;
+  min-width: 40px;
+  min-height: 40px;
+  max-width: 40px;
+  max-height: 40px;
+  object-fit: cover !important;
+  flex-shrink: 0;
+}
+
+.report-header img.rounded-circle {
+  aspect-ratio: 1 / 1;
+}
+
+/* Reporter Avatar */
+.reporter-avatar {
+  width: 45px;
+  height: 45px;
+  object-fit: cover;
+  border: 2px solid #198754;
+}
+
+.reporter-avatar-placeholder {
+  width: 45px;
+  height: 45px;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+/* Image Gallery - Stack Layout */
+.image-gallery {
+  margin: 0;
+}
+
+.image-stack {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.image-stack-item {
+  position: relative;
+  overflow: hidden;
+  border-radius: 8px;
+  aspect-ratio: 4/3;
+}
+
+.image-stack-item.single {
+  grid-column: span 2;
+  aspect-ratio: 16/9;
+}
+
+.report-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  cursor: pointer;
+  transition: transform 0.3s ease;
+}
+
+.report-image:hover {
+  transform: scale(1.05);
+}
+
+/* Description */
+.report-description {
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: #333;
+}
+
+/* Meta Information */
+.report-meta {
+  background: #f8f9fa;
+  padding: 10px 12px;
+  border-radius: 8px;
+}
+
+/* Upvote Button */
+.upvote-btn {
+  border-radius: 20px;
+  padding: 6px 16px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.upvote-btn:hover:not(:disabled) {
+  background-color: #198754;
+  color: white;
+  transform: translateY(-1px);
+}
+
+.upvote-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Map Container */
+.report-map-container {
+  height: 250px;
+  border-radius: 8px;
+  border: 1px solid #dee2e6;
+  background-color: #f8f9fa;
+}
+
+/* Comments */
+.comment-avatar {
+  width: 32px;
+  height: 32px;
+  object-fit: cover;
+  border: 2px solid #0d6efd;
+}
+
+.comment-avatar-placeholder {
+  width: 32px;
+  height: 32px;
+  font-size: 0.75rem;
+}
+
+.comment-item {
+  border-left: 3px solid #0d6efd;
+}
+
+/* Add Comment Section */
+.add-comment-section textarea {
+  border-radius: 8px;
+  resize: none;
+}
+
+/* Image Modal */
+.image-modal-backdrop {
+  background-color: rgba(0, 0, 0, 0.9);
+}
+
+.modal-close-btn {
+  z-index: 1050;
+}
+
+.modal-image {
+  max-height: 90vh;
+}
+
 /* Go to Top Button */
 .go-to-top {
 	position: fixed;
@@ -34,10 +247,164 @@
 	box-shadow: 0 6px 16px rgba(25, 135, 84, 0.4);
 }
 
+/* Dark Mode Support */
+body.dark-mode .report-card {
+  background-color: #1e1e1e;
+  border-color: #333;
+}
+
+body.dark-mode .report-header {
+  background: linear-gradient(135deg, #22c55e 0%, #10b981 100%);
+}
+
+body.dark-mode .report-description {
+  color: #e0e0e0;
+}
+
+body.dark-mode .report-meta {
+  background: #2d2d2d;
+}
+
+body.dark-mode .comment-item {
+  background-color: #2d2d2d !important;
+}
+
 body.dark-mode .go-to-top {
 	background: linear-gradient(135deg, #22c55e 0%, #10b981 100%);
 }
 
 body.dark-mode .go-to-top:hover {
 	background: linear-gradient(135deg, #10b981 0%, #22c55e 100%);
+}
+
+/* ===== MOBILE RESPONSIVE ===== */
+@media (max-width: 575.98px) {
+  /* Report header */
+  .report-header {
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-start !important;
+    padding: 10px 12px;
+  }
+
+  .report-header .pollution-badge {
+    font-size: 0.75rem;
+    padding: 4px 10px;
+  }
+
+  .report-header .status-badge {
+    font-size: 0.7rem;
+    padding: 3px 8px;
+  }
+
+  /* Image gallery */
+  .image-stack {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .image-stack-item.single {
+    grid-column: span 1;
+  }
+
+  .image-stack-item {
+    border-radius: 6px;
+  }
+
+  /* Reporter info */
+  .reporter-avatar,
+  .reporter-avatar-placeholder {
+    width: 38px;
+    height: 38px;
+    font-size: 0.9rem;
+  }
+
+  /* Description */
+  .report-description {
+    font-size: 0.9rem;
+    line-height: 1.5;
+  }
+
+  /* Meta info */
+  .report-meta {
+    padding: 8px 10px;
+    font-size: 0.8rem;
+  }
+
+  /* Upvote button */
+  .upvote-btn {
+    padding: 5px 12px;
+    font-size: 0.8rem;
+  }
+
+  /* Statistics cards */
+  .stat-card .card-body {
+    padding: 0.75rem 0.5rem;
+  }
+
+  .stat-card h3 {
+    font-size: 1.1rem;
+    margin-bottom: 0;
+  }
+
+  .stat-card small {
+    font-size: 0.7rem;
+  }
+
+  .stat-icon i.fa-2x {
+    font-size: 1.4rem !important;
+  }
+
+  /* Map container */
+  .report-map-container {
+    height: 180px;
+  }
+
+  /* Comments */
+  .comment-avatar,
+  .comment-avatar-placeholder {
+    width: 28px;
+    height: 28px;
+    font-size: 0.65rem;
+  }
+
+  .comment-item {
+    padding: 0.5rem !important;
+    font-size: 0.85rem;
+  }
+
+  /* Card body */
+  .report-card .card-body {
+    padding: 0.75rem;
+  }
+
+  /* Filter and sort row */
+  .filter-row {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .filter-row .form-select {
+    width: 100%;
+  }
+}
+
+/* Small devices (landscape phones) */
+@media (min-width: 576px) and (max-width: 767.98px) {
+  .image-stack {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .report-header {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .stat-card h3 {
+    font-size: 1.25rem;
+  }
+
+  .report-map-container {
+    height: 200px;
+  }
 }

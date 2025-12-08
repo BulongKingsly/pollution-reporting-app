@@ -1,0 +1,141 @@
+<div class="container py-5">
+  <div class="row justify-content-center">
+    <div class="col-md-6 col-lg-5">
+      <div class="card shadow-lg border-0 rounded-4">
+        <div class="card-header bg-success text-white text-center py-4">
+          <i class="fas fa-mobile-alt fa-3x mb-3"></i>
+          <h3 class="mb-0">Verify Phone Number</h3>
+          <p class="mb-0 opacity-75">Receive SMS notifications</p>
+        </div>
+
+        <div class="card-body p-4">
+          <!-- Already Verified State -->
+          @if (isVerified()) {
+            <div class="text-center py-4">
+              <i class="fas fa-check-circle text-success fa-4x mb-3"></i>
+              <h4 class="text-success">Phone Verified!</h4>
+              <p class="text-muted">{{ phoneNumber() }}</p>
+              <p class="mb-4">Your phone number is verified and ready to receive SMS notifications.</p>
+              <a routerLink="/settings" class="btn btn-success">
+                <i class="fas fa-arrow-left me-2"></i>Back to Settings
+              </a>
+            </div>
+          } @else {
+            <!-- Error Message -->
+            @if (errorMessage()) {
+              <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="fas fa-exclamation-circle me-2"></i>{{ errorMessage() }}
+                <button type="button" class="btn-close" (click)="errorMessage.set('')"></button>
+              </div>
+            }
+
+            <!-- Success Message -->
+            @if (successMessage()) {
+              <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <i class="fas fa-check-circle me-2"></i>{{ successMessage() }}
+                <button type="button" class="btn-close" (click)="successMessage.set('')"></button>
+              </div>
+            }
+
+            <!-- Step 1: Enter Phone Number -->
+            @if (!codeSent()) {
+              <div class="mb-4">
+                <label for="phoneNumber" class="form-label fw-bold">
+                  <i class="fas fa-phone text-success me-2"></i>Mobile Number
+                </label>
+                <input
+                  type="tel"
+                  class="form-control form-control-lg"
+                  id="phoneNumber"
+                  [value]="phoneNumber()"
+                  (input)="onPhoneInput($event)"
+                  placeholder="09123456789"
+                  [disabled]="isSendingCode()">
+                <small class="text-muted">
+                  Enter your Philippine mobile number (09XXXXXXXXX)
+                </small>
+              </div>
+
+              <button
+                class="btn btn-success btn-lg w-100"
+                (click)="sendVerificationCode()"
+                [disabled]="isSendingCode() || !isValidPhoneNumber()">
+                @if (isSendingCode()) {
+                  <span class="spinner-border spinner-border-sm me-2"></span>
+                  Sending...
+                } @else {
+                  <i class="fas fa-paper-plane me-2"></i>Send Verification Code
+                }
+              </button>
+            }
+
+            <!-- Step 2: Enter Verification Code -->
+            @if (codeSent()) {
+              <div class="text-center mb-4">
+                <p class="text-muted mb-2">Code sent to:</p>
+                <p class="fw-bold fs-5">{{ phoneNumber() }}</p>
+                <button
+                  class="btn btn-link btn-sm p-0"
+                  (click)="changePhoneNumber()">
+                  Change number
+                </button>
+              </div>
+
+              <div class="mb-4">
+                <label for="verificationCode" class="form-label fw-bold">
+                  <i class="fas fa-key text-success me-2"></i>Verification Code
+                </label>
+                <input
+                  type="text"
+                  class="form-control form-control-lg text-center letter-spacing-wide"
+                  id="verificationCode"
+                  [value]="verificationCode()"
+                  (input)="onCodeInput($event)"
+                  placeholder="000000"
+                  maxlength="6"
+                  [disabled]="isVerifying()">
+                <small class="text-muted">
+                  Enter the 6-digit code sent to your phone
+                </small>
+              </div>
+
+              <button
+                class="btn btn-success btn-lg w-100 mb-3"
+                (click)="verifyCode()"
+                [disabled]="isVerifying() || verificationCode().length !== 6">
+                @if (isVerifying()) {
+                  <span class="spinner-border spinner-border-sm me-2"></span>
+                  Verifying...
+                } @else {
+                  <i class="fas fa-check me-2"></i>Verify Code
+                }
+              </button>
+
+              <!-- Resend Code -->
+              <div class="text-center">
+                @if (resendCountdown() > 0) {
+                  <p class="text-muted mb-0">
+                    Resend code in {{ resendCountdown() }} seconds
+                  </p>
+                } @else {
+                  <button
+                    class="btn btn-link"
+                    (click)="sendVerificationCode()"
+                    [disabled]="isSendingCode()">
+                    <i class="fas fa-redo me-1"></i>Resend Code
+                  </button>
+                }
+              </div>
+            }
+          }
+        </div>
+
+        <div class="card-footer bg-light text-center py-3">
+          <a routerLink="/settings" class="text-decoration-none">
+            <i class="fas fa-arrow-left me-1"></i>Back to Settings
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

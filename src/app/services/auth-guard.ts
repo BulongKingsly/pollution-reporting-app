@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { Auth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, authState, User as FirebaseUser, sendPasswordResetEmail } from '@angular/fire/auth';
 import { Firestore, doc, setDoc, docData, updateDoc, collection, query, where, getDocs } from '@angular/fire/firestore';
-import { Observable, of, switchMap, take } from 'rxjs';
+import { Observable, of, switchMap, take, shareReplay } from 'rxjs';
 
 export interface AppUser {
   uid: string;
@@ -9,16 +9,25 @@ export interface AppUser {
   username?: string;  // Unique username
   fullName?: string;  // Full name from sign-up
   contact?: string;  // Contact number
+  phoneNumber?: string;  // Phone number (contact only)
+  emailVerified?: boolean;  // Whether email is verified for notifications
   address?: string;  // Physical address
   profilePictureUrl?: string;  // Profile picture URL
   role: 'user' | 'admin';
   createdAt: any;
   barangay: string;
+  suspended?: boolean;  // User suspension status
   settings?: {
     language: 'english' | 'filipino';
     textSize: 'small' | 'medium' | 'large';
     theme: 'light' | 'dark';
-    notifications: { email: boolean; announcement: boolean; upvote: boolean; };
+    notifications: {
+      email: boolean;
+      announcement: boolean;
+      upvote: boolean;
+      reportStatus: boolean;
+      passwordChange: boolean;
+    };
   };
 }
 
@@ -38,7 +47,8 @@ export class AuthService {
         } else {
           return of(null);
         }
-      })
+      }),
+      shareReplay({ bufferSize: 1, refCount: true })
     );
   }
 
@@ -59,6 +69,7 @@ export class AuthService {
       username: username || '',
       fullName: fullName || '',
       contact: contact || '',
+      phoneNumber: '',
       address: address || '',
       role,
       barangay,
@@ -67,7 +78,13 @@ export class AuthService {
         language: 'english',
         textSize: 'medium',
         theme: 'light',
-        notifications: { email: true, announcement: true, upvote: true }
+        notifications: {
+          email: true,
+          announcement: true,
+          upvote: true,
+          reportStatus: true,
+          passwordChange: true
+        }
       }
     });
   }
@@ -93,7 +110,7 @@ export class AuthService {
       const querySnapshot = await getDocs(q);
 
       if (querySnapshot.empty) {
-        throw new Error('User not found. Please check your username or email.');
+        throw new Error('No user found with this username.');
       }
 
       // Get the email from the user document
@@ -103,18 +120,44 @@ export class AuthService {
       if (!email) {
         throw new Error('No email associated with this username.');
       }
+    } else {
+      // Check if email exists in Firestore
+      const usersCollection = collection(this.firestore, 'users');
+      const q = query(usersCollection, where('email', '==', emailOrUsername));
+      const querySnapshot = await getDocs(q);
+
+      if (querySnapshot.empty) {
+        throw new Error('No user found with this email.');
+      }
     }
 
     // Sign in with email
-    const credential = await signInWithEmailAndPassword(this.auth, email, password);
+    try {
+      const credential = await signInWithEmailAndPassword(this.auth, email, password);
 
-    // Check if user is suspended
-    const userDoc = doc(this.firestore, `users/${credential.user.uid}`);
-    const userData = await docData(userDoc).pipe(take(1)).toPromise() as AppUser & { suspended?: boolean };
+      // Check if user is suspended
+      const userDoc = doc(this.firestore, `users/${credential.user.uid}`);
+      const userData = await docData(userDoc).pipe(take(1)).toPromise() as AppUser & { suspended?: boolean };
 
-    if (userData?.suspended === true) {
-      await signOut(this.auth); // Immediately sign out
-      throw new Error('Your account has been suspended. Please contact the administrator.');
+      if (userData?.suspended === true) {
+        await signOut(this.auth); // Immediately sign out
+        throw new Error('Your account has been suspended. Please contact the administrator.');
+      }
+    } catch (error: any) {
+      // Handle specific Firebase Auth errors
+      if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+        throw new Error('Incorrect password. Please try again.');
+      } else if (error.code === 'auth/user-not-found') {
+        throw new Error('No user found with this email.');
+      } else if (error.code === 'auth/too-many-requests') {
+        throw new Error('Too many failed attempts. Please try again later.');
+      } else if (error.code === 'auth/invalid-email') {
+        throw new Error('Invalid email format.');
+      } else if (error.message) {
+        throw error; // Re-throw our custom errors
+      } else {
+        throw new Error('Login failed. Please try again.');
+      }
     }
   }
 

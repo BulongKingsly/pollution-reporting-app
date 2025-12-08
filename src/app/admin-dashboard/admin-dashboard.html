@@ -1,7 +1,7 @@
 <!-- Navigation -->
 <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm sticky-top">
   <div class="container-fluid">
-    <a class="navbar-brand fw-bold text-success" routerLink="/home">
+    <a class="navbar-brand fw-bold text-success" routerLink="/">
       <i class="fas fa-leaf me-2"></i>Pollution Report
     </a>
 
@@ -12,17 +12,19 @@
     <div class="collapse navbar-collapse" id="navbarNav">
       <ul class="navbar-nav ms-auto align-items-center">
 
-        <li class="nav-item"><a class="nav-link" routerLink="/home"><i class="fas fa-home me-1"></i> Home</a></li>
+        <li class="nav-item"><a class="nav-link" routerLink="/"><i class="fas fa-home me-1"></i> Home</a></li>
         <li class="nav-item"><a class="nav-link" routerLink="/settings"><i class="fas fa-cog me-1"></i> Settings</a></li>
         <li class="nav-item" *ngIf="(user$ | async)?.role === 'admin'">
-          <a class="nav-link active" routerLink="/admin"><i class="fas fa-shield-alt me-1"></i> Admin</a>
-        </li>
-        <li class="nav-item ms-lg-3">
-          <a class="btn btn-success" routerLink="/submit-report"><i class="fas fa-plus me-1"></i> New Report</a>
+          <a class="nav-link active d-flex align-items-center" routerLink="/admin">
+            <i class="fas fa-shield-alt me-1"></i> Admin
+            @if (pendingApprovalCount > 0) {
+              <span class="badge bg-danger ms-1 notification-badge">{{ pendingApprovalCount > 99 ? '99+' : pendingApprovalCount }}</span>
+            }
+          </a>
         </li>
         <!-- User profile dropdown for desktop -->
         <li class="nav-item dropdown ms-lg-2 d-none d-lg-block" *ngIf="user$ | async as user">
-          <a class="nav-link dropdown-toggle d-flex align-items-center" data-bs-toggle="dropdown" title="User menu" aria-label="User menu">
+          <a class="nav-link dropdown-toggle d-flex align-items-center position-relative" data-bs-toggle="dropdown" title="User menu" aria-label="User menu">
             <img *ngIf="user.profilePictureUrl; else adminUserIcon"
                  [src]="user.profilePictureUrl"
                  alt="Profile"
@@ -34,9 +36,18 @@
                 {{ (user.fullName || user.email || 'U').charAt(0).toUpperCase() }}
               </div>
             </ng-template>
+            @if (unreadNotificationCount > 0) {
+              <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger profile-notification-badge">{{ unreadNotificationCount > 9 ? '9+' : unreadNotificationCount }}</span>
+            }
           </a>
           <ul class="dropdown-menu dropdown-menu-end">
             <li><a class="dropdown-item" routerLink="/profile"><i class="fas fa-user me-2"></i>My Profile</a></li>
+            <li>
+              <a class="dropdown-item d-flex justify-content-between align-items-center" routerLink="/notifications">
+                <span><i class="fas fa-bell me-2"></i>Notifications</span>
+                <span *ngIf="unreadNotificationCount > 0" class="badge bg-danger rounded-pill">{{ unreadNotificationCount > 99 ? '99+' : unreadNotificationCount }}</span>
+              </a>
+            </li>
             <li><a class="dropdown-item" routerLink="/settings"><i class="fas fa-cog me-2"></i>Settings</a></li>
             <li><hr class="dropdown-divider"></li>
             <li><a class="dropdown-item text-danger" (click)="logout()"><i class="fas fa-sign-out-alt me-2"></i>Logout</a></li>
@@ -57,25 +68,6 @@
           <div class="d-flex">
             <div class="toast-body">{{ t.message }}</div>
             <button type="button" class="btn-close btn-close-white me-2 m-auto" aria-label="Close toast" (click)="removeToast(t.id)"></button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Confirm modal (simple) -->
-      <div class="modal" tabindex="-1" [class.show]="confirmVisible" [style.display]="confirmVisible ? 'block' : 'none'">
-        <div class="modal-dialog modal-dialog-centered">
-          <div class="modal-content">
-            <div class="modal-header">
-              <h5 class="modal-title">Confirm</h5>
-              <button type="button" class="btn-close" aria-label="Close dialog" (click)="onConfirmAnswer(false)"></button>
-            </div>
-            <div class="modal-body">
-              <p>{{ confirmMessage }}</p>
-            </div>
-            <div class="modal-footer">
-              <button type="button" class="btn btn-secondary" (click)="onConfirmAnswer(false)">Cancel</button>
-              <button type="button" class="btn btn-danger" (click)="onConfirmAnswer(true)">Yes</button>
-            </div>
           </div>
         </div>
       </div>
@@ -167,121 +159,150 @@
     <!-- Main Content -->
     <main class="col-12 col-md-9 ms-sm-auto col-lg-10 px-3 px-md-4">
       <br>
+
       <!-- Reports -->
       <section [hidden]="activeTab !== 'reports'">
         <h2 class="fw-bold mb-3">Reports Management</h2>
+
+        <!-- Barangay Filter Dropdown (Main Admin Only) -->
+        @if (isMainAdmin) {
+          <div class="card mb-4">
+            <div class="card-body">
+              <div class="row align-items-center">
+                <div class="col-md-6">
+                  <label class="form-label fw-medium"><i class="fas fa-filter me-2"></i>Filter by Barangay</label>
+                  <select class="form-select" [(ngModel)]="selectedBarangayFilter" (change)="onBarangayFilterChange()" title="Select barangay to filter reports">
+                    <option value="">All Barangays</option>
+                    @for (b of barangays; track b.id) {
+                      <option [value]="b.id">{{ b.name }}</option>
+                    }
+                  </select>
+                </div>
+                <div class="col-md-6 text-md-end mt-3 mt-md-0">
+                  <span class="text-muted">
+                    <i class="fas fa-file-alt me-1"></i>
+                    Showing {{ getFilteredReportsCount() }} reports
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        }
+
         <div class="btn-group mb-4 w-100">
           <button class="btn btn-outline-success" (click)="filterStatus='all'" [class.active]="filterStatus==='all'">All</button>
-          <button class="btn btn-outline-warning" (click)="filterStatus='Pending'" [class.active]="filterStatus==='Pending'">Pending</button>
           <button class="btn btn-outline-primary" (click)="filterStatus='In Progress'" [class.active]="filterStatus==='In Progress'">In Progress</button>
           <button class="btn btn-outline-secondary" (click)="filterStatus='Done'" [class.active]="filterStatus==='Done'">Done</button>
         </div>
 
         <!-- Main admin view: grouped by barangay -->
-        <div *ngIf="isMainAdmin">
-          <div *ngFor="let barangayName of reportBarangayKeys" class="mb-4">
-            <h4 class="fw-semibold mb-3">
-              <i class="fas fa-map-marker-alt me-2"></i>{{ barangayName }}
-              <span class="badge bg-secondary ms-2">{{ reportsByBarangay[barangayName].length }}</span>
-            </h4>
-            <div *ngFor="let r of reportsByBarangay[barangayName]" class="card mb-3">
-              <div class="card-header bg-white">
-                <div class="row align-items-center">
-                  <div class="col-md-8">
-                    <h5 class="mb-0">{{ r.type | titlecase }} - {{ r.location }}</h5>
-                    <small class="text-muted">Reported by {{ r.reporterName }} • {{ formatTimestamp(r.createdAt) ? (formatTimestamp(r.createdAt) | date:'short') : 'just now' }}</small>
-                  </div>
-                  <div class="col-md-4 text-md-end">
-                    <span class="badge" [ngClass]="{
-                      'bg-warning': r.status === 'Pending',
-                      'bg-primary': r.status === 'In Progress',
-                      'bg-success': r.status === 'Done'
-                    }">{{ r.status }}</span>
-                    <span class="badge ms-2" [ngClass]="{
-                      'bg-success': r.approved === true,
-                      'bg-secondary': r.approved === false || !r.approved
-                    }">{{ r.approved ? 'Approved' : 'Pending Approval' }}</span>
-                  </div>
-                </div>
-              </div>
-              <div class="card-body">
-                <div class="row">
-                  <div class="col-md-3">
-                    <!-- Image Gallery -->
-                    <div *ngIf="r.images && r.images.length" class="mb-2">
-                      <div *ngFor="let img of r.images; let i = index" class="mb-2">
-                        <img [src]="img"
-                             class="img-fluid rounded"
-                             [alt]="r.type + ' report image ' + (i + 1)"
-                             style="cursor: pointer; width: 100%; object-fit: cover;"
-                             (click)="openImageModal(img)"
-                             title="Click to view full size">
+        @if (isMainAdmin) {
+          @for (barangayName of reportBarangayKeys; track barangayName) {
+            <div class="mb-4">
+              <h4 class="fw-semibold mb-3">
+                <i class="fas fa-map-marker-alt me-2"></i>{{ barangayName }}
+                <span class="badge bg-secondary ms-2">{{ reportsByBarangay[barangayName].length }}</span>
+              </h4>
+              @for (r of reportsByBarangay[barangayName]; track r.id) {
+                <div class="card mb-3 report-card">
+                  <div class="card-header report-card-header">
+                    <div class="d-flex justify-content-between align-items-start flex-wrap">
+                      <div>
+                        <h5 class="mb-1 text-white">{{ r.location }}</h5>
+                        <small class="text-white-50">Reported by {{ r.reporterName }} • {{ formatTimestamp(r.createdAt) ? (formatTimestamp(r.createdAt) | date:'short') : 'just now' }}</small>
+                      </div>
+                      <div class="d-flex gap-2 flex-wrap mt-2 mt-md-0">
+                        <span class="badge bg-danger">{{ r.type | titlecase }} Pollution</span>
+                        <span class="badge"
+                              [class.bg-warning]="r.status === 'Pending'"
+                              [class.bg-primary]="r.status === 'In Progress'"
+                              [class.bg-success]="r.status === 'Done'"
+                              [class.text-dark]="r.status === 'Pending'">{{ r.status }}</span>
                       </div>
                     </div>
-                    <div *ngIf="!r.images || !r.images.length">
-                      <img src="https://placehold.co/300x200/e8f5e9/2e7d32?text=No+Image" class="img-fluid rounded" alt="No image">
-                    </div>
                   </div>
-                  <div class="col-md-9">
+                  <div class="card-body">
+                    <!-- Images stacked above content -->
+                    <div class="report-images-stack">
+                      @if (r.images && r.images.length) {
+                        <div class="image-grid" [class.single-image]="r.images.length === 1">
+                          @for (img of r.images; track img; let i = $index) {
+                            <div class="image-item">
+                              <img [src]="img"
+                                   [alt]="r.type + ' report image ' + (i + 1)"
+                                   (click)="openImageModal(img)"
+                                   title="Click to view full size">
+                            </div>
+                          }
+                        </div>
+                      } @else {
+                        <img src="https://placehold.co/400x200/e8f5e9/2e7d32?text=No+Image" class="img-fluid rounded w-100" alt="No image">
+                      }
+                    </div>
+
+                    <!-- Description -->
                     <p class="mb-3">{{ r.description }}</p>
 
-                    <!-- Map Display (if coordinates exist) -->
-                    <div *ngIf="r.lat && r.lng" class="mb-3">
-                      <h6 class="fw-semibold mb-2"><i class="fas fa-map-marked-alt me-2"></i>Report Location</h6>
-                      <div [id]="'admin-map-' + r.id" style="height: 250px; border-radius: 8px; border: 1px solid #dee2e6; background-color: #f8f9fa;"></div>
-                      <button class="btn btn-sm btn-outline-primary mt-2"
-                              (click)="initializeMap(r.id!, r.lat!, r.lng!)">
-                        <i class="fas fa-map me-1"></i>Show Map
-                      </button>
-                    </div>
-
-                    <!-- Comments Section -->
-                    <div *ngIf="(r.comments || []).length > 0" class="mb-3">
-                      <h6 class="fw-semibold mb-2"><i class="fas fa-comments me-2"></i>Comments ({{ (r.comments || []).length }})</h6>
-                      <div *ngFor="let comment of r.comments" class="mb-2 p-2 bg-light rounded">
-                        <div class="d-flex align-items-start">
-                          <img *ngIf="getUserProfilePicture(comment.userId) as commentPic; else commentAvatar"
-                               [src]="commentPic"
-                               alt="Commenter"
-                               class="rounded-circle me-2"
-                               style="width: 28px; height: 28px; object-fit: cover; border: 2px solid #0d6efd;">
-                          <ng-template #commentAvatar>
-                            <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center me-2"
-                                 style="width: 28px; height: 28px; font-size: 0.7rem;">
-                              {{ getInitials(comment.userName) }}
-                            </div>
-                          </ng-template>
-                          <div class="flex-grow-1">
-                            <div class="d-flex align-items-center">
-                              <span class="fw-semibold small me-2">{{ comment.userName }}</span>
-                              <small class="text-muted">{{ formatCommentDate(comment.createdAt) | date:'short' }}</small>
-                            </div>
-                            <p class="mb-0 small">{{ comment.text }}</p>
-                          </div>
-                        </div>
+                    <!-- Map Display (if coordinates exist) - smaller than images -->
+                    @if (r.lat && r.lng) {
+                      <div class="mb-3">
+                        <h6 class="fw-semibold mb-2"><i class="fas fa-map-marked-alt me-2"></i>Report Location</h6>
+                        <div [id]="'admin-map-' + r.id" class="report-map-container"></div>
+                        <button class="btn btn-sm btn-outline-primary mt-2"
+                                (click)="initializeMap(r.id!, r.lat!, r.lng!)">
+                          <i class="fas fa-map me-1"></i>Show Map
+                        </button>
                       </div>
-                    </div>
+                    }
 
-                    <!-- Add Comment / Response -->
+                    <!-- Admin Responses Section -->
+                    @if ((r.comments || []).length > 0) {
+                      <div class="mb-3">
+                        <h6 class="fw-semibold mb-2"><i class="fas fa-comments me-2"></i>Admin Responses ({{ (r.comments || []).length }})</h6>
+                        @for (comment of r.comments; track comment.createdAt) {
+                          <div class="mb-2 p-2 bg-light rounded">
+                            <div class="d-flex align-items-start">
+                              @if (getUserProfilePicture(comment.userId); as commentPic) {
+                                <img [src]="commentPic"
+                                     alt="Commenter"
+                                     class="rounded-circle me-2 comment-avatar-img">
+                              } @else {
+                                <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center me-2 comment-avatar">
+                                  {{ getInitials(comment.userName) }}
+                                </div>
+                              }
+                              <div class="flex-grow-1">
+                                <div class="d-flex align-items-center">
+                                  <span class="fw-semibold small me-2">{{ comment.userName }}</span>
+                                  <small class="text-muted">{{ formatCommentDate(comment.createdAt) | date:'short' }}</small>
+                                </div>
+                                <p class="mb-0 small">{{ comment.text }}</p>
+                              </div>
+                            </div>
+                          </div>
+                        }
+                      </div>
+                    }
+
+                    <!-- Add Admin Response -->
                     <div class="mb-3">
-                      <label class="form-label fw-medium">Add Comment / Response</label>
+                      <label class="form-label fw-medium">Add Admin Response</label>
                       <textarea class="form-control" rows="2"
                                 [(ngModel)]="commentTexts[r.id || '']"
-                                [name]="'main-admin-comment-' + r.id"
-                                placeholder="Add a comment or response to this report..."></textarea>
+                                [name]="'main-admin-response-' + r.id"
+                                placeholder="Add an admin response to this report..."></textarea>
                       <button class="btn btn-sm btn-primary mt-2"
                               (click)="r.id && addCommentToReport(r.id)"
                               [disabled]="!r.id">
-                        <i class="fas fa-paper-plane me-1"></i>Send Comment
+                        <i class="fas fa-paper-plane me-1"></i>Send Response
                       </button>
                     </div>
 
                     <div class="mb-3">
                       <label class="form-label fw-medium">Update Status</label>
-                      <select class="form-select" title="Update status" (change)="updateStatus(r, $any($event.target).value)">
-                        <option [value]="'Pending'">Pending</option>
-                        <option [value]="'In Progress'">In Progress</option>
-                        <option [value]="'Done'">Done</option>
+                      <select class="form-select" title="Update status" [value]="r.status" (change)="updateStatus(r, $any($event.target).value)">
+                        <option [value]="'In Progress'" [selected]="r.status === 'In Progress'">In Progress</option>
+                        <option [value]="'Done'" [selected]="r.status === 'Done'">Done</option>
                       </select>
                     </div>
 
@@ -292,125 +313,128 @@
                     </div>
                   </div>
                 </div>
-              </div>
+              }
             </div>
-          </div>
-        </div>
+          }
+        }
 
         <!-- Barangay admin view: single list for their barangay -->
-        <div *ngIf="!isMainAdmin">
-          <div *ngIf="reports.length === 0" class="text-muted">No reports yet.</div>
-          <div *ngFor="let r of filteredReports()" class="card mb-3">
-            <div class="card-header bg-white">
-              <div class="row align-items-center">
-                <div class="col-md-8">
-                  <h5 class="mb-0">{{ r.type | titlecase }} - {{ r.location }}</h5>
-                  <small class="text-muted">Reported by {{ r.reporterName }} • {{ formatTimestamp(r.createdAt) ? (formatTimestamp(r.createdAt) | date:'short') : 'just now' }}</small>
-                </div>
-                <div class="col-md-4 text-md-end">
-                  <span class="badge" [ngClass]="{
-                    'bg-warning': r.status === 'Pending',
-                    'bg-primary': r.status === 'In Progress',
-                    'bg-success': r.status === 'Done'
-                  }">{{ r.status }}</span>
-                  <span class="badge ms-2" [ngClass]="{
-                    'bg-success': r.approved === true,
-                    'bg-secondary': r.approved === false || !r.approved
-                  }">{{ r.approved ? 'Approved' : 'Pending Approval' }}</span>
+        @if (!isMainAdmin) {
+          @if (reports.length === 0) {
+            <div class="text-muted">No reports yet.</div>
+          }
+          @for (r of filteredReports(); track r.id) {
+            <div class="card mb-3 report-card">
+              <div class="card-header report-card-header">
+                <div class="d-flex justify-content-between align-items-start flex-wrap">
+                  <div>
+                    <h5 class="mb-1 text-white">{{ r.location }}</h5>
+                    <small class="text-white-50">Reported by {{ r.reporterName }} • {{ formatTimestamp(r.createdAt) ? (formatTimestamp(r.createdAt) | date:'short') : 'just now' }}</small>
+                  </div>
+                  <div class="d-flex gap-2 flex-wrap mt-2 mt-md-0">
+                    <span class="badge bg-danger">{{ r.type | titlecase }} Pollution</span>
+                    <span class="badge"
+                          [class.bg-warning]="r.status === 'Pending'"
+                          [class.bg-primary]="r.status === 'In Progress'"
+                          [class.bg-success]="r.status === 'Done'"
+                          [class.text-dark]="r.status === 'Pending'">{{ r.status }}</span>
+                  </div>
                 </div>
               </div>
-            </div>
-            <div class="card-body">
-              <div class="row">
-                <div class="col-md-3">
-                  <!-- Image Gallery -->
-                  <div *ngIf="r.images && r.images.length" class="mb-2">
-                    <div *ngFor="let img of r.images; let i = index" class="mb-2">
-                      <img [src]="img"
-                           class="img-fluid rounded"
-                           [alt]="r.type + ' report image ' + (i + 1)"
-                           style="cursor: pointer; width: 100%; object-fit: cover;"
-                           (click)="openImageModal(img)"
-                           title="Click to view full size">
+              <div class="card-body">
+                <!-- Images stacked above content -->
+                <div class="report-images-stack">
+                  @if (r.images && r.images.length) {
+                    <div class="image-grid" [class.single-image]="r.images.length === 1">
+                      @for (img of r.images; track img; let i = $index) {
+                        <div class="image-item">
+                          <img [src]="img"
+                               [alt]="r.type + ' report image ' + (i + 1)"
+                               (click)="openImageModal(img)"
+                               title="Click to view full size">
+                        </div>
+                      }
                     </div>
-                  </div>
-                  <div *ngIf="!r.images || !r.images.length">
-                    <img src="https://placehold.co/300x200/e8f5e9/2e7d32?text=No+Image" class="img-fluid rounded" alt="No image">
-                  </div>
+                  } @else {
+                    <img src="https://placehold.co/400x200/e8f5e9/2e7d32?text=No+Image" class="img-fluid rounded w-100" alt="No image">
+                  }
                 </div>
-                <div class="col-md-9">
-                  <p class="mb-3">{{ r.description }}</p>
 
-                  <!-- Map Display (if coordinates exist) -->
-                  <div *ngIf="r.lat && r.lng" class="mb-3">
+                <!-- Description -->
+                <p class="mb-3">{{ r.description }}</p>
+
+                <!-- Map Display (if coordinates exist) - smaller than images -->
+                @if (r.lat && r.lng) {
+                  <div class="mb-3">
                     <h6 class="fw-semibold mb-2"><i class="fas fa-map-marked-alt me-2"></i>Report Location</h6>
-                    <div [id]="'admin-map-' + r.id" style="height: 250px; border-radius: 8px; border: 1px solid #dee2e6; background-color: #f8f9fa;"></div>
+                    <div [id]="'admin-map-' + r.id" class="report-map-container"></div>
                     <button class="btn btn-sm btn-outline-primary mt-2"
                             (click)="initializeMap(r.id!, r.lat!, r.lng!)">
                       <i class="fas fa-map me-1"></i>Show Map
                     </button>
                   </div>
+                }
 
-                  <!-- Comments Section -->
-                  <div *ngIf="(r.comments || []).length > 0" class="mb-3">
-                    <h6 class="fw-semibold mb-2"><i class="fas fa-comments me-2"></i>Comments ({{ (r.comments || []).length }})</h6>
-                    <div *ngFor="let comment of r.comments" class="mb-2 p-2 bg-light rounded">
-                      <div class="d-flex align-items-start">
-                        <img *ngIf="getUserProfilePicture(comment.userId) as commentPic; else barangayCommentAvatar"
-                             [src]="commentPic"
-                             alt="Commenter"
-                             class="rounded-circle me-2"
-                             style="width: 28px; height: 28px; object-fit: cover; border: 2px solid #0d6efd;">
-                        <ng-template #barangayCommentAvatar>
-                          <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center me-2"
-                               style="width: 28px; height: 28px; font-size: 0.7rem;">
-                            {{ getInitials(comment.userName) }}
+                <!-- Admin Responses Section -->
+                @if ((r.comments || []).length > 0) {
+                  <div class="mb-3">
+                    <h6 class="fw-semibold mb-2"><i class="fas fa-comments me-2"></i>Admin Responses ({{ (r.comments || []).length }})</h6>
+                    @for (comment of r.comments; track comment.createdAt) {
+                      <div class="mb-2 p-2 bg-light rounded">
+                        <div class="d-flex align-items-start">
+                          @if (getUserProfilePicture(comment.userId); as commentPic) {
+                            <img [src]="commentPic"
+                                 alt="Commenter"
+                                 class="rounded-circle me-2 comment-avatar-img">
+                          } @else {
+                            <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center me-2 comment-avatar">
+                              {{ getInitials(comment.userName) }}
+                            </div>
+                          }
+                          <div class="flex-grow-1">
+                            <div class="d-flex align-items-center">
+                              <span class="fw-semibold small me-2">{{ comment.userName }}</span>
+                              <small class="text-muted">{{ formatCommentDate(comment.createdAt) | date:'short' }}</small>
+                            </div>
+                            <p class="mb-0 small">{{ comment.text }}</p>
                           </div>
-                        </ng-template>
-                        <div class="flex-grow-1">
-                          <div class="d-flex align-items-center">
-                            <span class="fw-semibold small me-2">{{ comment.userName }}</span>
-                            <small class="text-muted">{{ formatCommentDate(comment.createdAt) | date:'short' }}</small>
-                          </div>
-                          <p class="mb-0 small">{{ comment.text }}</p>
                         </div>
                       </div>
-                    </div>
+                    }
                   </div>
+                }
 
-                  <!-- Add Comment / Response -->
-                  <div class="mb-3">
-                    <label class="form-label fw-medium">Add Comment / Response</label>
-                    <textarea class="form-control" rows="2"
-                              [(ngModel)]="commentTexts[r.id || '']"
-                              [name]="'admin-comment-' + r.id"
-                              placeholder="Add a comment or response to this report..."></textarea>
-                    <button class="btn btn-sm btn-primary mt-2"
-                            (click)="r.id && addCommentToReport(r.id)"
-                            [disabled]="!r.id">
-                      <i class="fas fa-paper-plane me-1"></i>Send Comment
-                    </button>
-                  </div>
+                <!-- Add Admin Response -->
+                <div class="mb-3">
+                  <label class="form-label fw-medium">Add Admin Response</label>
+                  <textarea class="form-control" rows="2"
+                            [(ngModel)]="commentTexts[r.id || '']"
+                            [name]="'admin-response-' + r.id"
+                            placeholder="Add an admin response to this report..."></textarea>
+                  <button class="btn btn-sm btn-primary mt-2"
+                          (click)="r.id && addCommentToReport(r.id)"
+                          [disabled]="!r.id">
+                    <i class="fas fa-paper-plane me-1"></i>Send Response
+                  </button>
+                </div>
 
-                  <div class="mb-3">
-                    <label class="form-label fw-medium">Update Status</label>
-                    <select class="form-select" title="Update status" (change)="updateStatus(r, $any($event.target).value)">
-                      <option [value]="'Pending'">Pending</option>
-                      <option [value]="'In Progress'">In Progress</option>
-                      <option [value]="'Done'">Done</option>
-                    </select>
-                  </div>
+                <div class="mb-3">
+                  <label class="form-label fw-medium">Update Status</label>
+                  <select class="form-select" title="Update status" [value]="r.status" (change)="updateStatus(r, $any($event.target).value)">
+                    <option [value]="'In Progress'" [selected]="r.status === 'In Progress'">In Progress</option>
+                    <option [value]="'Done'" [selected]="r.status === 'Done'">Done</option>
+                  </select>
+                </div>
 
-                  <div class="d-flex gap-2">
-                    <button class="btn btn-outline-danger" (click)="deleteReport(r)">
-                      <i class="fas fa-trash me-1"></i>Delete Report
-                    </button>
-                  </div>
+                <div class="d-flex gap-2">
+                  <button class="btn btn-outline-danger" (click)="deleteReport(r)">
+                    <i class="fas fa-trash me-1"></i>Delete Report
+                  </button>
                 </div>
               </div>
             </div>
-          </div>
-        </div>
+          }
+        }
       </section>
 
       <!-- Submitted Reports (Pending Approvals) -->
@@ -418,65 +442,87 @@
         <h2 class="fw-bold mb-4">Submitted Reports</h2>
         <p class="text-muted mb-4">Review and approve submitted reports before they appear on the home page.</p>
 
+        <!-- Barangay Filter Dropdown (Main Admin Only) -->
+        @if (isMainAdmin) {
+          <div class="card mb-4">
+            <div class="card-body">
+              <div class="row align-items-center">
+                <div class="col-md-6">
+                  <label class="form-label fw-medium"><i class="fas fa-filter me-2"></i>Filter by Barangay</label>
+                  <select class="form-select" [(ngModel)]="selectedTasksBarangayFilter" title="Select barangay to filter submitted reports">
+                    <option value="">All Barangays</option>
+                    @for (b of barangays; track b.id) {
+                      <option [value]="b.id">{{ b.name }}</option>
+                    }
+                  </select>
+                </div>
+                <div class="col-md-6 text-md-end mt-3 mt-md-0">
+                  <span class="text-muted">
+                    <i class="fas fa-clipboard-list me-1"></i>
+                    Showing {{ getPendingReports().length }} pending reports
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        }
+
         <div *ngIf="getPendingReports().length === 0" class="alert alert-info">
           <i class="fas fa-check-circle me-2"></i>No pending reports to approve. All reports have been reviewed!
         </div>
 
         <div *ngFor="let r of getPendingReports()" class="card mb-3">
-          <div class="card-header bg-white">
-            <div class="row align-items-center">
-              <div class="col-md-8">
-                <h5 class="mb-0">{{ r.type | titlecase }} - {{ r.location }}</h5>
-                <small class="text-muted">Reported by {{ r.reporterName }} • {{ formatTimestamp(r.createdAt) ? (formatTimestamp(r.createdAt) | date:'short') : 'just now' }}</small>
+          <div class="card-header report-card-header">
+            <div class="d-flex justify-content-between align-items-start flex-wrap">
+              <div>
+                <h5 class="mb-1 text-white">{{ r.location }}</h5>
+                <small class="text-white-50">Reported by {{ r.reporterName }} • {{ formatTimestamp(r.createdAt) ? (formatTimestamp(r.createdAt) | date:'short') : 'just now' }}</small>
               </div>
-              <div class="col-md-4 text-md-end">
-                <span class="badge bg-warning">Pending Approval</span>
+              <div class="d-flex gap-2 flex-wrap mt-2 mt-md-0">
+                <span class="badge bg-danger">{{ r.type | titlecase }} Pollution</span>
+                <span class="badge bg-warning text-dark">Pending Approval</span>
               </div>
             </div>
           </div>
           <div class="card-body">
-            <div class="row">
-              <div class="col-md-3">
-                <!-- Image Gallery -->
-                <div *ngIf="r.images && r.images.length" class="mb-2">
-                  <div *ngFor="let img of r.images; let i = index" class="mb-2">
-                    <img [src]="img"
-                         class="img-fluid rounded"
-                         [alt]="r.type + ' report image ' + (i + 1)"
-                         style="cursor: pointer; width: 100%; object-fit: cover;"
-                         (click)="openImageModal(img)"
-                         title="Click to view full size">
-                  </div>
-                </div>
-                <div *ngIf="!r.images || !r.images.length">
-                  <img src="https://placehold.co/300x200/e8f5e9/2e7d32?text=No+Image" class="img-fluid rounded" alt="No image">
+            <!-- Images stacked above content -->
+            <div class="report-images-stack">
+              <div *ngIf="r.images && r.images.length" class="image-grid" [class.single-image]="r.images.length === 1">
+                <div *ngFor="let img of r.images; let i = index" class="image-item">
+                  <img [src]="img"
+                       [alt]="r.type + ' report image ' + (i + 1)"
+                       (click)="openImageModal(img)"
+                       title="Click to view full size">
                 </div>
               </div>
-              <div class="col-md-9">
-                <p class="mb-3"><strong>Description:</strong> {{ r.description }}</p>
-                <p class="mb-2"><strong>Location:</strong> {{ r.location }}</p>
-                <p class="mb-2"><strong>Date Reported:</strong> {{ r.date }} at {{ r.time }}</p>
-                <p class="mb-3"><strong>Barangay:</strong> {{ getBarangayName(r.barangayId) }}</p>
-
-                <!-- Map Display (if coordinates exist) -->
-                <div *ngIf="r.lat && r.lng" class="mb-3">
-                  <h6 class="fw-semibold mb-2"><i class="fas fa-map-marked-alt me-2"></i>Report Location</h6>
-                  <div [id]="'task-map-' + r.id" style="height: 250px; border-radius: 8px; border: 1px solid #dee2e6; background-color: #f8f9fa;"></div>
-                  <button class="btn btn-sm btn-outline-primary mt-2"
-                          (click)="initializeMap(r.id!, r.lat!, r.lng!, 'task-map-')">
-                    <i class="fas fa-map me-1"></i>Show Map
-                  </button>
-                </div>
-
-                <div class="d-flex gap-2 mt-3">
-                  <button class="btn btn-success" (click)="approveReport(r)">
-                    <i class="fas fa-check me-1"></i>Approve & Publish
-                  </button>
-                  <button class="btn btn-outline-danger" (click)="deleteReport(r)">
-                    <i class="fas fa-trash me-1"></i>Reject & Delete
-                  </button>
-                </div>
+              <div *ngIf="!r.images || !r.images.length">
+                <img src="https://placehold.co/400x200/e8f5e9/2e7d32?text=No+Image" class="img-fluid rounded w-100" alt="No image">
               </div>
+            </div>
+
+            <!-- Description -->
+            <p class="mb-3"><strong>Description:</strong> {{ r.description }}</p>
+            <p class="mb-2"><strong>Location:</strong> {{ r.location }}</p>
+            <p class="mb-2"><strong>Date Reported:</strong> {{ r.date }} at {{ r.time }}</p>
+            <p class="mb-3"><strong>Barangay:</strong> {{ getBarangayName(r.barangayId) }}</p>
+
+            <!-- Map Display (if coordinates exist) - smaller than images -->
+            <div *ngIf="r.lat && r.lng" class="mb-3">
+              <h6 class="fw-semibold mb-2"><i class="fas fa-map-marked-alt me-2"></i>Report Location</h6>
+              <div [id]="'task-map-' + r.id" class="report-map-container"></div>
+              <button class="btn btn-sm btn-outline-primary mt-2"
+                      (click)="initializeMap(r.id!, r.lat!, r.lng!, 'task-map-')">
+                <i class="fas fa-map me-1"></i>Show Map
+              </button>
+            </div>
+
+            <div class="d-flex gap-2 mt-3">
+              <button class="btn btn-success" (click)="approveReport(r)">
+                <i class="fas fa-check me-1"></i>Approve & Publish
+              </button>
+              <button class="btn btn-outline-danger" (click)="rejectReport(r)">
+                <i class="fas fa-times me-1"></i>Reject Report
+              </button>
             </div>
           </div>
         </div>
@@ -527,6 +573,31 @@
         </div>
 
         <h4 class="fw-bold mb-3">Recent Announcements</h4>
+
+        <!-- Barangay Filter Dropdown (Main Admin Only) -->
+        @if (isMainAdmin) {
+          <div class="card mb-4">
+            <div class="card-body">
+              <div class="row align-items-center">
+                <div class="col-md-6">
+                  <label class="form-label fw-medium"><i class="fas fa-filter me-2"></i>Filter by Barangay</label>
+                  <select class="form-select" [(ngModel)]="selectedAnnouncementsBarangayFilter" title="Select barangay to filter announcements">
+                    <option value="">All Barangays</option>
+                    @for (b of barangays; track b.id) {
+                      <option [value]="b.id">{{ b.name }}</option>
+                    }
+                  </select>
+                </div>
+                <div class="col-md-6 text-md-end mt-3 mt-md-0">
+                  <span class="text-muted">
+                    <i class="fas fa-bullhorn me-1"></i>
+                    Showing {{ getFilteredAnnouncementsCount() }} announcements
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        }
 
         <!-- Main admin view: grouped by barangay -->
         <div *ngIf="isMainAdmin">
@@ -580,12 +651,30 @@
         <div *ngIf="isMainAdmin">
           <div class="card mb-4">
             <div class="card-body">
-              <div class="row g-2 align-items-center">
+              <h5 class="card-title mb-3"><i class="fas fa-plus-circle me-2"></i>Create New Barangay</h5>
+              <div class="row g-3">
                 <div class="col-md-6">
-                  <input class="form-control" #newBarangay placeholder="New barangay name" title="New barangay name">
+                  <label class="form-label">Barangay Name <span class="text-danger">*</span></label>
+                  <input class="form-control" #newBarangay placeholder="e.g., Barangay Legarda" title="New barangay name">
                 </div>
-                <div class="col-md-6">
-                  <button class="btn btn-success" (click)="createBarangay(newBarangay.value)">Create Barangay</button>
+                <div class="col-md-3">
+                  <label class="form-label">Center Latitude <span class="text-danger">*</span></label>
+                  <input class="form-control" #newBarangayLat type="number" step="0.0001" placeholder="e.g., 16.4023" title="Latitude coordinate">
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label">Center Longitude <span class="text-danger">*</span></label>
+                  <input class="form-control" #newBarangayLng type="number" step="0.0001" placeholder="e.g., 120.5960" title="Longitude coordinate">
+                </div>
+                <div class="col-12">
+                  <small class="text-muted">
+                    <i class="fas fa-info-circle me-1"></i>
+                    Tip: Search your barangay on <a href="https://www.openstreetmap.org" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> and right-click to get coordinates. The boundary will be automatically fetched from OSM.
+                  </small>
+                </div>
+                <div class="col-12">
+                  <button class="btn btn-success" (click)="createBarangay(newBarangay.value, +newBarangayLat.value, +newBarangayLng.value)">
+                    <i class="fas fa-plus me-1"></i>Create Barangay
+                  </button>
                 </div>
               </div>
             </div>
@@ -612,7 +701,6 @@
                 <div class="col-12">
                   <div class="d-flex flex-wrap gap-2">
                     <a class="btn btn-outline-primary" [routerLink]="['/admin/barangay', b.id]" title="Open barangay admin">Open</a>
-                    <button class="btn btn-outline-secondary" (click)="openBarangayAnalytics(b.id || '')" title="Barangay analytics">Analytics</button>
                     <button class="btn btn-outline-danger" (click)="removeBarangay(b.id || '')">Delete</button>
                   </div>
                 </div>
@@ -652,9 +740,6 @@
                   <a class="btn btn-primary me-2 mb-2" [routerLink]="['/admin/barangay', b.id]">
                     <i class="fas fa-edit me-2"></i>Manage Barangay
                   </a>
-                  <button class="btn btn-outline-secondary" (click)="openBarangayAnalytics(b.id || '')">
-                    <i class="fas fa-chart-bar me-2"></i>View Analytics
-                  </button>
                 </div>
               </div>
             </div>
@@ -669,6 +754,31 @@
       <!-- Users -->
       <section [hidden]="activeTab !== 'users'">
         <h2 class="fw-bold mb-4">Users Management</h2>
+
+        <!-- Barangay Filter Dropdown (Main Admin Only) -->
+        @if (isMainAdmin) {
+          <div class="card mb-4">
+            <div class="card-body">
+              <div class="row align-items-center">
+                <div class="col-md-6">
+                  <label class="form-label fw-medium"><i class="fas fa-filter me-2"></i>Filter by Barangay</label>
+                  <select class="form-select" [(ngModel)]="selectedUsersBarangayFilter" title="Select barangay to filter users">
+                    <option value="">All Barangays</option>
+                    @for (b of barangays; track b.id) {
+                      <option [value]="b.id">{{ b.name }}</option>
+                    }
+                  </select>
+                </div>
+                <div class="col-md-6 text-md-end mt-3 mt-md-0">
+                  <span class="text-muted">
+                    <i class="fas fa-users me-1"></i>
+                    Showing {{ getFilteredUsersCount() }} users
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        }
 
         <!-- Main admin view: grouped by barangay -->
         <div *ngIf="isMainAdmin">
@@ -735,7 +845,7 @@
                 </tr>
               </thead>
               <tbody>
-                <tr *ngFor="let u of users">
+                <tr *ngFor="let u of filteredUsersForBarangayAdmin">
                   <td>{{ u.fullName || u.email || 'Unknown' }}</td>
                   <td>{{ u.email }}</td>
                   <td>{{ getBarangayName(u.barangay) }}</td>
@@ -769,36 +879,47 @@
       <!-- Analytics -->
       <section [hidden]="activeTab !== 'analytics'">
         <h2 class="fw-bold mb-4">Analytics Overview</h2>
-        <div class="row mb-4">
-          <div class="col-md-3">
-            <div class="card bg-primary text-white">
-              <div class="card-body">
-                <h3 class="fw-bold">{{ reports.length }}</h3>
-                <p class="mb-0">Total Reports</p>
+
+        <!-- Barangay Filter Dropdown (Main Admin Only) -->
+        @if (isMainAdmin) {
+          <div class="card mb-4">
+            <div class="card-body">
+              <div class="row align-items-center">
+                <div class="col-md-6">
+                  <label class="form-label fw-medium"><i class="fas fa-filter me-2"></i>Filter by Barangay</label>
+                  <select class="form-select" [(ngModel)]="selectedAnalyticsBarangayFilter" (change)="onAnalyticsBarangayFilterChange()" title="Select barangay to filter analytics">
+                    <option value="">All Barangays</option>
+                    @for (b of barangays; track b.id) {
+                      <option [value]="b.id">{{ b.name }}</option>
+                    }
+                  </select>
+                </div>
+                <div class="col-md-6 text-md-end mt-3 mt-md-0">
+                  <span class="text-muted">
+                    <i class="fas fa-chart-bar me-1"></i>
+                    Showing analytics for {{ selectedAnalyticsBarangayFilter ? getBarangayName(selectedAnalyticsBarangayFilter) : 'All Barangays' }}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
-          <div class="col-md-3">
-            <div class="card bg-warning text-white">
-              <div class="card-body">
-                <h3 class="fw-bold">{{ pendingCount }}</h3>
-                <p class="mb-0">Pending</p>
+        }
+
+        <!-- Charts -->
+        <div class="card">
+          <div class="card-body">
+            <h5 class="mb-3">Last 7 Days Activity</h5>
+            <div class="row">
+              <div class="col-md-8 mb-4 mb-md-0">
+                <div class="chart-container">
+                  <canvas #analyticsBarCanvas></canvas>
+                </div>
               </div>
-            </div>
-          </div>
-          <div class="col-md-3">
-            <div class="card bg-info text-white">
-              <div class="card-body">
-                <h3 class="fw-bold">{{ inProgressCount }}</h3>
-                <p class="mb-0">In Progress</p>
-              </div>
-            </div>
-          </div>
-          <div class="col-md-3">
-            <div class="card bg-success text-white">
-              <div class="card-body">
-                <h3 class="fw-bold">{{ doneCount }}</h3>
-                <p class="mb-0">Resolved</p>
+              <div class="col-md-4">
+                <h6 class="mb-3">Reports by Type</h6>
+                <div class="chart-container-pie">
+                  <canvas #analyticsPieCanvas></canvas>
+                </div>
               </div>
             </div>
           </div>
@@ -815,17 +936,23 @@
 
 <!-- Mobile Bottom Navigation (visible only on mobile) -->
 <nav class="mobile-bottom-nav d-md-none">
-  <a routerLink="/home" class="mobile-nav-item" routerLinkActive="active">
+  <a routerLink="/" class="mobile-nav-item" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}">
     <i class="fas fa-home"></i>
     <span>Home</span>
   </a>
-  <a routerLink="/submit-report" class="mobile-nav-item">
-    <i class="fas fa-plus-circle"></i>
-    <span>Report</span>
+  <a routerLink="/notifications" class="mobile-nav-item position-relative" routerLinkActive="active">
+    <i class="fas fa-bell"></i>
+    <span>Alerts</span>
+    @if (unreadNotificationCount > 0) {
+      <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger mobile-badge">{{ unreadNotificationCount > 9 ? '9+' : unreadNotificationCount }}</span>
+    }
   </a>
-  <a routerLink="/admin" class="mobile-nav-item active">
+  <a routerLink="/admin" class="mobile-nav-item active position-relative">
     <i class="fas fa-shield-alt"></i>
     <span>Admin</span>
+    @if (pendingApprovalCount > 0) {
+      <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger mobile-badge">{{ pendingApprovalCount > 9 ? '9+' : pendingApprovalCount }}</span>
+    }
   </a>
   <a routerLink="/profile" class="mobile-nav-item" routerLinkActive="active">
     <i class="fas fa-user"></i>

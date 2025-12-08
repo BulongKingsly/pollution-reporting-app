@@ -16,6 +16,9 @@ export interface Barangay {
   adminIds: string[];
   streets: (string | Street)[];  // Support both old and new format
   pollutionTypes: string[];
+  lat?: number;  // Center latitude of barangay
+  lng?: number;  // Center longitude of barangay
+  boundary?: number[][];  // GeoJSON polygon coordinates for boundary
   createdAt?: any;
 }
 
@@ -43,17 +46,22 @@ export class BarangaysService {
   }
 
   /** Create a new barangay and return its doc id (via addDoc result) */
-  async createBarangay(payload: { name: string; adminId?: string; streets?: string[]; pollutionTypes?: string[]; }) {
+  async createBarangay(payload: { name: string; adminId?: string; streets?: string[]; pollutionTypes?: string[]; lat?: number; lng?: number; boundary?: number[][]; }) {
     // creating a barangay is restricted to main-admins
     await this.ensureAdminFor(null, true);
     const col = collection(this.firestore, 'barangays');
-    const docRef = await addDoc(col, {
+    const data: any = {
       name: payload.name,
       adminIds: payload.adminId ? [payload.adminId] : [],
       streets: payload.streets || [],
       pollutionTypes: payload.pollutionTypes || [],
       createdAt: serverTimestamp()
-    });
+    };
+    // Add coordinates if provided
+    if (payload.lat != null) data.lat = payload.lat;
+    if (payload.lng != null) data.lng = payload.lng;
+    if (payload.boundary) data.boundary = payload.boundary;
+    const docRef = await addDoc(col, data);
     return docRef.id;
   }
 

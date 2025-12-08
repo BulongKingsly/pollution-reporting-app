@@ -5,6 +5,7 @@ import { Observable, switchMap, firstValueFrom } from 'rxjs';
 import { AnnouncementsService } from '../services/announcements';
 import { AuthService } from '../services/auth-guard';
 import { Announcement, AppUser } from '../interfaces';
+import { NotificationService } from '../services/notification.service';
 
 @Component({
   selector: 'app-announcements',
@@ -25,7 +26,11 @@ export class AnnouncementsComponent implements OnInit {
     location: 'all'
   };
 
-  constructor(private announcementsService: AnnouncementsService, private auth: AuthService) {
+  constructor(
+    private announcementsService: AnnouncementsService,
+    private auth: AuthService,
+    private notify: NotificationService
+  ) {
     this.user$ = this.auth.user$;
   }
 
@@ -39,7 +44,7 @@ export class AnnouncementsComponent implements OnInit {
     const current = await firstValueFrom(this.auth.user$).catch(() => null as AppUser | null);
     const userBarangay = current?.barangay || null;
     if (!this.model.title || !this.model.description) {
-      alert('Title and description required');
+      this.notify.warning('Title and description required', 'Missing Fields');
       return;
     }
     const target = this.model.location || 'all';
@@ -54,9 +59,10 @@ export class AnnouncementsComponent implements OnInit {
         barangayId: barangayId
       });
       this.model = { title: '', subtitle: '', description: '', location: 'all' };
+      this.notify.success('Announcement posted successfully', 'Success');
     } catch (err) {
       console.error('Failed to post announcement', err);
-      alert('Failed to post announcement');
+      this.notify.error('Failed to post announcement', 'Error');
     }
   }
 }

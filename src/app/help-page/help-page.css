@@ -1,0 +1,148 @@
+/* Notification Badge */
+.notification-badge {
+  font-size: 0.65rem;
+  padding: 0.25em 0.5em;
+  min-width: 1.2rem;
+}
+
+/* Profile notification badge */
+.profile-notification-badge {
+  font-size: 0.55rem;
+  padding: 0.2em 0.4em;
+  min-width: 1rem;
+  transform: translate(-50%, -25%) !important;
+}
+
+/* Mobile nav badge */
+.mobile-badge {
+  font-size: 0.55rem;
+  padding: 0.15em 0.35em;
+  min-width: 1rem;
+}
+
+/* Emergency Contact Cards */
+.emergency-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  border-radius: 12px;
+}
+
+.emergency-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1) !important;
+}
+
+.emergency-icon {
+  width: 50px;
+  height: 50px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+.emergency-card a {
+  color: #198754;
+}
+
+.emergency-card a:hover {
+  color: #146c43;
+}
+
+/* ===== MOBILE RESPONSIVE ===== */
+@media (max-width: 575.98px) {
+  /* Page header */
+  .page-header {
+    padding: 1rem;
+  }
+
+  .page-header h2 {
+    font-size: 1.25rem;
+  }
+
+  /* Accordion */
+  .accordion-button {
+    font-size: 0.9rem;
+    padding: 0.875rem 1rem;
+  }
+
+  .accordion-body {
+    padding: 1rem;
+    font-size: 0.875rem;
+  }
+
+  /* FAQ items */
+  .faq-item h6 {
+    font-size: 0.95rem;
+  }
+
+  .faq-item p {
+    font-size: 0.85rem;
+  }
+
+  /* Emergency cards on mobile */
+  .emergency-icon {
+    width: 45px;
+    height: 45px;
+    font-size: 1.1rem;
+  }
+
+  .emergency-card h6 {
+    font-size: 0.9rem;
+  }
+
+  .emergency-card .small {
+    font-size: 0.75rem !important;
+  }
+
+  .emergency-card a {
+    font-size: 0.85rem;
+  }
+
+  /* Emergency section header */
+  h3.fw-bold {
+    font-size: 1.1rem;
+  }
+
+  /* Contact cards */
+  .contact-card {
+    padding: 1rem;
+  }
+
+  .contact-card i {
+    font-size: 1.5rem;
+  }
+
+  .contact-card h5 {
+    font-size: 1rem;
+  }
+
+  .contact-card p {
+    font-size: 0.85rem;
+  }
+
+  /* Cards */
+  .card {
+    margin-bottom: 0.75rem;
+  }
+
+  .card-header {
+    padding: 0.75rem 1rem;
+  }
+
+  .card-body {
+    padding: 1rem;
+  }
+}
+
+@media (min-width: 576px) and (max-width: 767.98px) {
+  .accordion-button {
+    font-size: 0.95rem;
+  }
+
+  .accordion-body {
+    font-size: 0.9rem;
+  }
+}

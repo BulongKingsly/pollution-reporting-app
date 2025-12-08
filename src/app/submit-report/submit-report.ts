@@ -1,12 +1,14 @@
 import { Component, AfterViewInit, OnDestroy, ViewEncapsulation } from '@angular/core';
 import { ReportsService } from '../services/reports';
-import { BarangaysService, Street } from '../services/barangays.service';
+import { BarangaysService, Barangay, Street } from '../services/barangays.service';
 import { AuthService, AppUser } from '../services/auth-guard';
+import { NotificationService } from '../services/notification.service';
+import { NotificationsService } from '../services/notifications.service';
 import { Observable, firstValueFrom, of } from 'rxjs';
 import { switchMap, map } from 'rxjs/operators';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
-import { Router, RouterLink } from '@angular/router';
+import { Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { getStorage, ref as storageRef } from '@angular/fire/storage';
 import { uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 
@@ -14,11 +16,12 @@ import { uploadBytesResumable, getDownloadURL } from 'firebase/storage';
   selector: 'app-submit-report',
   templateUrl: './submit-report.html',
   styleUrls: ['./submit-report.css'],
-  imports: [FormsModule, CommonModule, RouterLink],
+  imports: [FormsModule, CommonModule, RouterLink, RouterLinkActive],
   encapsulation: ViewEncapsulation.None
 })
 export class SubmitReport {
   user$: Observable<AppUser | null>;
+
   report = {
     type: '',
     location: '',
@@ -33,10 +36,18 @@ export class SubmitReport {
   // map related
   private map: any = null;
   private marker: any = null;
+  private boundaryLayer: any = null;
   private L: any = null; // Store Leaflet reference
+  private userBarangay: Barangay | null = null;
 
   // Baguio City base coordinates (center)
   private baguioCityCenter: [number, number] = [16.4023, 120.5960];
+
+  // Unread notifications count
+  unreadNotificationCount = 0;
+
+  // Admin pending approval count
+  adminPendingApprovalCount = 0;
 
   // Street coordinates for Baguio City streets (you can expand this)
   private locationCoords: Record<string, [number, number]> = {
@@ -68,15 +79,31 @@ export class SubmitReport {
     private reportsService: ReportsService,
     private auth: AuthService,
     private barangaysService: BarangaysService,
-    private router: Router
+    private router: Router,
+    private notify: NotificationService,
+    private notificationsService: NotificationsService
   ) {
     this.user$ = this.auth.user$;
+    // Load unread notification count
+    this.user$.pipe(
+      switchMap(u => u ? this.notificationsService.getUnreadCount(u.uid) : of(0))
+    ).subscribe(count => this.unreadNotificationCount = count);
+
+    // Load admin pending approval count (for admin badge in navbar)
+    this.user$.pipe(
+      switchMap(user => {
+        if (!user || user.role !== 'admin') return of(0);
+        return this.reportsService.getAllReports().pipe(
+          map(reports => reports.filter(r => r.approved === false || r.approved === undefined || r.approved === null).length)
+        );
+      })
+    ).subscribe(count => this.adminPendingApprovalCount = count);
     // load lookup lists from Firestore via BarangaysService for the current user's barangay
     this.pollutionTypes$ = this.auth.user$.pipe(
       switchMap(u => u && u.barangay ? this.barangaysService.getBarangayById(u.barangay).pipe(map(b => (b && b.pollutionTypes) ? b.pollutionTypes.map(t => ({ value: t, label: t })) : [])) : of([]))
     );
     this.locations$ = this.auth.user$.pipe(
-      switchMap(u => u && u.barangay ? this.barangaysService.getBarangayById(u.barangay).pipe(map(b => (b && b.streets) ? b.streets.map(s => {
+      switchMap(u => u && u.barangay ? this.barangaysService.getBarangayById(u.barangay).pipe(map(s => (s && s.streets) ? s.streets.map(s => {
         const name = typeof s === 'string' ? s : s.name;
         return { value: typeof s === 'string' ? s : JSON.stringify(s), label: name };
       }) : [])) : of([]))
@@ -122,10 +149,27 @@ export class SubmitReport {
           });
         }
 
-        // create map centered on Baguio City
+        // Get user's barangay to center map
+        const user = await firstValueFrom(this.user$);
+        let mapCenter = this.baguioCityCenter;
+        let initialZoom = 14;
+
+        if (user?.barangay) {
+          const barangay = await firstValueFrom(this.barangaysService.getBarangayById(user.barangay));
+          if (barangay) {
+            this.userBarangay = barangay;
+            if (barangay.lat != null && barangay.lng != null) {
+              mapCenter = [barangay.lat, barangay.lng];
+              initialZoom = 16;
+              console.log(`Centering map on barangay ${barangay.name} at [${barangay.lat}, ${barangay.lng}]`);
+            }
+          }
+        }
+
+        // create map centered on user's barangay or Baguio City
         this.map = this.L.map('map', {
-          center: this.baguioCityCenter,
-          zoom: 14,
+          center: mapCenter,
+          zoom: initialZoom,
           zoomControl: true,
           scrollWheelZoom: true
         });
@@ -136,6 +180,25 @@ export class SubmitReport {
           attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
           maxZoom: 19
         }).addTo(this.map);
+
+        // Add barangay boundary if available
+        if (this.userBarangay?.boundary && this.userBarangay.boundary.length > 0) {
+          this.addBarangayBoundary(this.userBarangay.boundary);
+        } else if (this.userBarangay?.name) {
+          // Try to fetch boundary from OSM if not stored
+          this.fetchAndShowBarangayBoundary(this.userBarangay.name);
+        }
+
+        // Create draggable marker at center immediately
+        this.createDraggableMarker(mapCenter[0], mapCenter[1]);
+        this.report.lat = mapCenter[0];
+        this.report.lng = mapCenter[1];
+
+        // Add click handler to place marker anywhere on map
+        this.map.on('click', (e: any) => {
+          const { lat, lng } = e.latlng;
+          this.moveMarkerTo(lat, lng);
+        });
 
         // Force map to resize properly - multiple attempts
         setTimeout(() => {
@@ -159,11 +222,183 @@ export class SubmitReport {
           }
         }, 500);
 
-        console.log('Leaflet map initialized successfully - Baguio City');
+        console.log('Leaflet map initialized successfully');
       } catch (e) {
         console.error('Leaflet failed to load', e);
       }
     }, 300);
+  }
+
+  /** Add barangay boundary polygon to map with red border */
+  private addBarangayBoundary(boundary: number[][]) {
+    if (!this.map || !this.L || !boundary || boundary.length === 0) return;
+
+    // Remove existing boundary layer if any
+    if (this.boundaryLayer) {
+      this.map.removeLayer(this.boundaryLayer);
+    }
+
+    // Convert [lng, lat] to [lat, lng] for Leaflet (GeoJSON uses [lng, lat])
+    const latLngs = boundary.map((coord: number[]) => [coord[1], coord[0]]);
+
+    this.boundaryLayer = this.L.polygon(latLngs, {
+      color: '#dc3545',  // Red border
+      weight: 3,
+      fillColor: '#dc3545',
+      fillOpacity: 0.1,
+      dashArray: '5, 5'
+    }).addTo(this.map);
+
+    // Fit map to boundary
+    this.map.fitBounds(this.boundaryLayer.getBounds(), { padding: [20, 20] });
+    console.log('Barangay boundary added to map');
+  }
+
+  /** Fetch barangay boundary from OpenStreetMap Nominatim API */
+  private async fetchAndShowBarangayBoundary(barangayName: string) {
+    try {
+      const query = encodeURIComponent(`${barangayName}, Baguio City, Philippines`);
+      const url = `https://nominatim.openstreetmap.org/search?q=${query}&format=json&polygon_geojson=1&limit=1`;
+
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'PollutionReportingApp/1.0'
+        }
+      });
+
+      if (!response.ok) {
+        console.warn('Failed to fetch boundary from OSM');
+        return;
+      }
+
+      const data = await response.json();
+      if (data.length > 0 && data[0].geojson) {
+        const geojson = data[0].geojson;
+        let boundary: number[][] | undefined;
+
+        if (geojson.type === 'Polygon') {
+          boundary = geojson.coordinates[0];
+        } else if (geojson.type === 'MultiPolygon') {
+          boundary = geojson.coordinates[0][0];
+        }
+
+        if (boundary) {
+          this.addBarangayBoundary(boundary);
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching barangay boundary:', err);
+    }
+  }
+
+  /** Create a draggable marker at specified position */
+  private createDraggableMarker(lat: number, lng: number) {
+    if (!this.map || !this.L) return;
+
+    if (this.marker) {
+      this.marker.setLatLng([lat, lng]);
+      return;
+    }
+
+    this.marker = this.L.marker([lat, lng], {
+      draggable: true,
+      title: 'Drag me to pinpoint exact location'
+    }).addTo(this.map);
+
+    // Add a popup to make marker more visible
+    this.marker.bindPopup('<b>📍 Drag me!</b><br>Move to exact pollution location').openPopup();
+
+    // Handle marker drag events
+    this.marker.on('dragend', (ev: any) => {
+      const m = ev.target;
+      const pos = m.getLatLng();
+      this.report.lat = pos.lat;
+      this.report.lng = pos.lng;
+      console.log(`Marker dragged to: ${pos.lat}, ${pos.lng}`);
+      // Update location text via reverse geocoding
+      this.reverseGeocode(pos.lat, pos.lng);
+    });
+
+    this.marker.on('drag', (ev: any) => {
+      const m = ev.target;
+      const pos = m.getLatLng();
+      this.report.lat = pos.lat;
+      this.report.lng = pos.lng;
+    });
+
+    // Initial reverse geocode
+    this.reverseGeocode(lat, lng);
+  }
+
+  /** Move marker to specified position */
+  private moveMarkerTo(lat: number, lng: number) {
+    this.report.lat = lat;
+    this.report.lng = lng;
+
+    if (this.marker) {
+      this.marker.setLatLng([lat, lng]);
+    } else {
+      this.createDraggableMarker(lat, lng);
+    }
+    console.log(`Marker moved to: ${lat}, ${lng}`);
+    // Update location text via reverse geocoding
+    this.reverseGeocode(lat, lng);
+  }
+
+  /** Reverse geocode coordinates to get address/location name */
+  private async reverseGeocode(lat: number, lng: number) {
+    try {
+      const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&addressdetails=1&zoom=18`;
+
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'PollutionReportingApp/1.0'
+        }
+      });
+
+      if (!response.ok) {
+        console.warn('Failed to reverse geocode');
+        this.report.location = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+        return;
+      }
+
+      const data = await response.json();
+      if (data && data.display_name) {
+        // Build a shorter, more readable address
+        const addr = data.address || {};
+        const parts: string[] = [];
+
+        // Add road/street name if available
+        if (addr.road) parts.push(addr.road);
+        else if (addr.pedestrian) parts.push(addr.pedestrian);
+        else if (addr.footway) parts.push(addr.footway);
+
+        // Add neighborhood/suburb
+        if (addr.neighbourhood) parts.push(addr.neighbourhood);
+        else if (addr.suburb) parts.push(addr.suburb);
+        else if (addr.quarter) parts.push(addr.quarter);
+
+        // Add barangay if available
+        if (addr.village) parts.push(addr.village);
+
+        // Add city
+        if (addr.city) parts.push(addr.city);
+        else if (addr.town) parts.push(addr.town);
+
+        if (parts.length > 0) {
+          this.report.location = parts.join(', ');
+        } else {
+          // Fallback to full display name but truncate
+          this.report.location = data.display_name.split(',').slice(0, 3).join(',').trim();
+        }
+        console.log('Location set to:', this.report.location);
+      } else {
+        this.report.location = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+      }
+    } catch (err) {
+      console.error('Reverse geocoding error:', err);
+      this.report.location = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+    }
   }
 
   ngOnDestroy(): void {
@@ -204,14 +439,9 @@ export class SubmitReport {
     this.progressPerImage = new Array(this.report.images.length).fill(0);
   }
 
-  /** Called when the user changes the location select */
-  onLocationChange(value: string) {
-    console.log('onLocationChange called:', value);
-    console.log('Map exists?', !!this.map);
-    console.log('Leaflet exists?', !!this.L);
-
+  /** Called when user selects a street from the dropdown (optional) */
+  onStreetSelect(value: string) {
     if (!value || !this.map || !this.L) {
-      console.warn('Cannot update location: map or Leaflet not ready');
       return;
     }
 
@@ -229,72 +459,41 @@ export class SubmitReport {
 
     if (typeof streetData === 'string') {
       streetName = streetData;
-      this.report.location = streetName;
     } else {
       streetName = streetData.name;
-      this.report.location = streetName;
       if (streetData.lat != null && streetData.lng != null) {
         coords = [streetData.lat, streetData.lng];
       }
     }
 
-    // If no coordinates from Firestore, check hardcoded lookup or generate approximate
+    // If no coordinates from Firestore, check hardcoded lookup or use barangay center
     if (!coords) {
       coords = this.locationCoords[streetName];
       if (!coords) {
-        // Generate approximate coordinates near Baguio City center
-        const offset = Math.random() * 0.01;
-        coords = [this.baguioCityCenter[0] + offset, this.baguioCityCenter[1] + offset];
-        console.log(`No predefined coordinates for "${streetName}", using approximate location`);
+        // Use barangay center or Baguio City center
+        if (this.userBarangay?.lat != null && this.userBarangay?.lng != null) {
+          const offset = (Math.random() - 0.5) * 0.002;
+          coords = [this.userBarangay.lat + offset, this.userBarangay.lng + offset];
+        } else {
+          const offset = Math.random() * 0.005;
+          coords = [this.baguioCityCenter[0] + offset, this.baguioCityCenter[1] + offset];
+        }
       }
     }
 
     const [lat, lng] = coords;
 
-    // Center map on the location
+    // Set location to selected street name
+    this.report.location = streetName;
+
+    // Center map and move marker
     this.map.setView([lat, lng], 17);
+    this.moveMarkerTo(lat, lng);
 
-    // Add or move draggable marker
-    if (this.marker) {
-      // If marker already exists, just move it
-      this.marker.setLatLng([lat, lng]);
-      console.log('Marker moved to:', lat, lng);
-    } else {
-      // Create new draggable marker
-      this.marker = this.L.marker([lat, lng], {
-        draggable: true,
-        title: 'Drag me to pinpoint exact location'
-      }).addTo(this.map);
+    console.log(`Street selected: "${streetName}" at [${lat}, ${lng}]`);
+  }
 
-      // Add a popup to make marker more visible
-      this.marker.bindPopup('<b>📍 Drag me!</b><br>Move to exact pollution location').openPopup();
-
-      // Handle marker drag event
-      this.marker.on('dragend', (ev: any) => {
-        const m = ev.target;
-        const pos = m.getLatLng();
-        this.report.lat = pos.lat;
-        this.report.lng = pos.lng;
-        console.log(`Marker dragged to: ${pos.lat}, ${pos.lng}`);
-      });
-
-      // Handle marker drag (while dragging)
-      this.marker.on('drag', (ev: any) => {
-        const m = ev.target;
-        const pos = m.getLatLng();
-        this.report.lat = pos.lat;
-        this.report.lng = pos.lng;
-      });
-
-      console.log('New marker created at:', lat, lng);
-    }
-
-    // Set initial lat/lng in the form
-    this.report.lat = lat;
-    this.report.lng = lng;
-
-    console.log(`Map centered on "${streetName}" at [${lat}, ${lng}]`);
-  }  // Compress a single image to target KB range using canvas
+  // Compress a single image to target KB range using canvas
   async compressImage(file: File, maxWidth = 1280, targetMinKB = 200, targetMaxKB = 400): Promise<File> {
     const url = URL.createObjectURL(file);
     const img = new Image();
@@ -353,14 +552,22 @@ export class SubmitReport {
   async submit() {
     // basic validation
     if (!this.report.type) {
-      return alert('Please select pollution type');
+      this.notify.warning('Please select pollution type', 'Missing Information');
+      return;
     }
-    if (!this.report.location || !this.report.description) {
-      return alert('Please provide location and description');
+    if (!this.report.description) {
+      this.notify.warning('Please provide a description', 'Missing Information');
+      return;
+    }
+    // Location is now optional (street), but lat/lng from map is required
+    if (this.report.lat == null || this.report.lng == null) {
+      this.notify.warning('Please set a location on the map by clicking or dragging the marker', 'Missing Location');
+      return;
     }
 
     if ((this.report.images || []).length === 0) {
-      return alert('Please upload at least one image');
+      this.notify.warning('Please upload at least one image', 'Missing Images');
+      return;
     }
 
     this.uploading = true;
@@ -368,8 +575,9 @@ export class SubmitReport {
       const user = await firstValueFrom(this.user$);
       if (!user) {
         this.uploading = false;
-        alert('You must be logged in to submit a report');
-        return this.router.navigate(['/login']);
+        this.notify.error('You must be logged in to submit a report', 'Not Logged In');
+        this.router.navigate(['/login']);
+        return;
       }
       // Prepare: compress images
       this.progressTotal = this.report.images.length;
@@ -435,9 +643,18 @@ export class SubmitReport {
       }
 
       // Save document with URLs
+      // If no street selected, use barangay name or coordinates as location
+      let locationText = this.report.location;
+      if (!locationText && this.userBarangay?.name) {
+        locationText = this.userBarangay.name;
+      }
+      if (!locationText && this.report.lat != null && this.report.lng != null) {
+        locationText = `${this.report.lat.toFixed(6)}, ${this.report.lng.toFixed(6)}`;
+      }
+
       await this.reportsService.saveReportWithUrls(user, {
         type: this.report.type,
-        location: this.report.location,
+        location: locationText || 'Unknown Location',
         description: this.report.description,
         imageUrls: uploadedUrls,
         dateTaken: this.report.dateTaken,
@@ -453,12 +670,12 @@ export class SubmitReport {
       this.previews = [];
       this.progressPerImage = [];
       this.uploading = false;
-      alert('Report submitted successfully! Your report will be reviewed and approved by an admin before it is published.');
-      await this.router.navigate(['/home']);
+      this.notify.success('Report submitted successfully! Your report will be reviewed and approved by an admin before it is published.', 'Report Submitted');
+      await this.router.navigate(['/']);
     } catch (err) {
       console.error('Failed to submit report', err);
       this.uploading = false;
-      alert('Failed to submit report');
+      this.notify.error('Failed to submit report. Please try again.', 'Submission Failed');
     }
   }
 }

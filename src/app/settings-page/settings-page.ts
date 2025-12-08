@@ -2,27 +2,37 @@ import { Component, OnInit } from '@angular/core';
 import { AuthService, AppUser } from '../services/auth-guard';
 import { Firestore, doc, updateDoc, Timestamp } from '@angular/fire/firestore';
 import { Auth, EmailAuthProvider, reauthenticateWithCredential, updatePassword } from '@angular/fire/auth';
-import { Observable } from 'rxjs';
-import { take } from 'rxjs/operators';
+import { Functions, httpsCallable } from '@angular/fire/functions';
+import { Observable, of } from 'rxjs';
+import { take, switchMap, map } from 'rxjs/operators';
 import { FormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
-import { RouterLink, Router } from '@angular/router';
+import { RouterLink, Router, RouterLinkActive } from '@angular/router';
 import { TranslationService } from '../services/translation.service';
+import { NotificationsService } from '../services/notifications.service';
+import { ReportsService } from '../services/reports';
 
 @Component({
   selector: 'app-settings',
   templateUrl: './settings-page.html',
   styleUrls: ['./settings-page.css'],
-  imports: [FormsModule, CommonModule, RouterLink]
+  imports: [FormsModule, CommonModule, RouterLink, RouterLinkActive]
 })
 export class SettingsPage implements OnInit {
   user$: Observable<AppUser | null>;
   currentUser: AppUser | null = null;
+
   settings = {
     language: 'english' as 'english' | 'filipino',
     textSize: 'medium' as 'small' | 'medium' | 'large',
     theme: 'light' as 'light' | 'dark',
-    notifications: { email: true, announcement: true, upvote: true }
+    notifications: {
+      email: true,
+      announcement: true,
+      upvote: true,
+      reportStatus: true,
+      passwordChange: true
+    }
   };
 
   // Change Password fields
@@ -35,27 +45,75 @@ export class SettingsPage implements OnInit {
   passwordSuccess = '';
   isChangingPassword = false;
 
+  // Password change verification
+  passwordChangeStep: 'form' | 'verify' = 'form';
+  passwordVerificationCode = '';
+  isSendingPasswordCode = false;
+  isVerifyingPasswordCode = false;
+  passwordCodeSent = false;
+
+  // Email Verification fields
+  emailVerificationCode = '';
+  isSendingVerificationCode = false;
+  isVerifyingEmail = false;
+  verificationCodeSent = false;
+  emailVerificationError = '';
+  emailVerificationSuccess = '';
+
   // Loading states
   isSavingSettings = false;
 
   toasts: { message: string; type: string }[] = [];
 
+  // Unread notifications count
+  unreadNotificationCount = 0;
+
+  // Admin pending approval count
+  adminPendingApprovalCount = 0;
+
   constructor(
     private authService: AuthService,
     private firebaseAuth: Auth,
     private firestore: Firestore,
+    private functions: Functions,
     private router: Router,
-    private translationService: TranslationService
+    private translationService: TranslationService,
+    private notificationsService: NotificationsService,
+    private reportsService: ReportsService
   ) {
     this.user$ = this.authService.user$;
+    // Load unread notification count
+    this.user$.pipe(
+      switchMap(user => user ? this.notificationsService.getUnreadCount(user.uid) : of(0))
+    ).subscribe(count => this.unreadNotificationCount = count);
+
+    // Load admin pending approval count (for admin badge in navbar)
+    this.user$.pipe(
+      switchMap(user => {
+        if (!user || user.role !== 'admin') return of(0);
+        return this.reportsService.getAllReports().pipe(
+          map(reports => reports.filter(r => r.approved === false || r.approved === undefined || r.approved === null).length)
+        );
+      })
+    ).subscribe(count => this.adminPendingApprovalCount = count);
   }
 
   async ngOnInit() {
     // Load user settings from Firestore
     this.user$.pipe(take(1)).subscribe(user => {
       this.currentUser = user;
-      if (user?.settings) {
-        this.settings = { ...user.settings };
+      if (user) {
+        if (user.settings) {
+          // Merge user settings with defaults to ensure new properties exist
+          this.settings = {
+            ...this.settings,
+            ...user.settings,
+            notifications: {
+              ...this.settings.notifications,
+              ...user.settings.notifications
+            }
+          };
+        }
         this.applySettings();
       } else {
         // Apply default settings
@@ -126,20 +184,101 @@ export class SettingsPage implements OnInit {
       return;
     }
 
+    // First verify current password before sending code
     this.isChangingPassword = true;
-
     try {
       const user = this.firebaseAuth.currentUser;
       if (!user || !user.email) {
         throw new Error('No authenticated user found.');
       }
 
-      // Reauthenticate user
+      // Reauthenticate to verify current password
       const credential = EmailAuthProvider.credential(
         user.email,
         this.passwordForm.currentPassword
       );
+      await reauthenticateWithCredential(user, credential);
 
+      // Current password is correct, now send verification code
+      this.isChangingPassword = false;
+      await this.sendPasswordChangeCode();
+
+    } catch (error: any) {
+      this.isChangingPassword = false;
+      if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+        this.passwordError = 'Current password is incorrect.';
+      } else if (error.code === 'auth/too-many-requests') {
+        this.passwordError = 'Too many attempts. Please try again later.';
+      } else {
+        this.passwordError = error.message || 'Failed to verify password.';
+      }
+      this.showToast(this.passwordError, 'danger');
+    }
+  }
+
+  async sendPasswordChangeCode() {
+    if (this.isSendingPasswordCode) return;
+
+    this.passwordError = '';
+    this.isSendingPasswordCode = true;
+
+    try {
+      const sendCode = httpsCallable(this.functions, 'sendPasswordChangeCode');
+      const result = await sendCode({});
+      const data = result.data as any;
+
+      if (data.success) {
+        this.passwordChangeStep = 'verify';
+        this.passwordCodeSent = true;
+        this.showToast('Verification code sent to your email!', 'success');
+      } else {
+        this.passwordError = data.error || 'Failed to send verification code.';
+        this.showToast(this.passwordError, 'danger');
+      }
+    } catch (error: any) {
+      console.error('Failed to send password change code:', error);
+      this.passwordError = 'Failed to send verification code. Please try again.';
+      this.showToast(this.passwordError, 'danger');
+    } finally {
+      this.isSendingPasswordCode = false;
+    }
+  }
+
+  async verifyAndChangePassword() {
+    if (this.isVerifyingPasswordCode || !this.passwordVerificationCode) return;
+
+    if (this.passwordVerificationCode.length !== 6) {
+      this.passwordError = 'Please enter a valid 6-digit code.';
+      return;
+    }
+
+    this.passwordError = '';
+    this.isVerifyingPasswordCode = true;
+
+    try {
+      // Verify the code first
+      const verifyCode = httpsCallable(this.functions, 'verifyPasswordChangeCode');
+      const verifyResult = await verifyCode({ code: this.passwordVerificationCode });
+      const verifyData = verifyResult.data as any;
+
+      if (!verifyData.success) {
+        this.passwordError = verifyData.message || 'Invalid verification code.';
+        this.showToast(this.passwordError, 'danger');
+        this.isVerifyingPasswordCode = false;
+        return;
+      }
+
+      // Code verified, now change the password
+      const user = this.firebaseAuth.currentUser;
+      if (!user || !user.email) {
+        throw new Error('No authenticated user found.');
+      }
+
+      // Reauthenticate again (session might have expired)
+      const credential = EmailAuthProvider.credential(
+        user.email,
+        this.passwordForm.currentPassword
+      );
       await reauthenticateWithCredential(user, credential);
 
       // Update password
@@ -149,12 +288,8 @@ export class SettingsPage implements OnInit {
       this.passwordSuccess = 'Password updated successfully!';
       this.showToast('Password updated successfully!', 'success');
 
-      // Clear form
-      this.passwordForm = {
-        currentPassword: '',
-        newPassword: '',
-        confirmPassword: ''
-      };
+      // Clear form and reset step
+      this.resetPasswordForm();
 
     } catch (error: any) {
       console.error('Password change error:', error);
@@ -174,8 +309,25 @@ export class SettingsPage implements OnInit {
 
       this.showToast(this.passwordError, 'danger');
     } finally {
-      this.isChangingPassword = false;
+      this.isVerifyingPasswordCode = false;
     }
+  }
+
+  resetPasswordForm() {
+    this.passwordForm = {
+      currentPassword: '',
+      newPassword: '',
+      confirmPassword: ''
+    };
+    this.passwordChangeStep = 'form';
+    this.passwordVerificationCode = '';
+    this.passwordCodeSent = false;
+    this.passwordError = '';
+  }
+
+  cancelPasswordChange() {
+    this.resetPasswordForm();
+    this.passwordSuccess = '';
   }
 
   showToast(message: string, type: string) {
@@ -252,5 +404,86 @@ export class SettingsPage implements OnInit {
     } catch (error) {
       console.error('Failed to auto-save settings:', error);
     }
+  }
+
+  // Send email verification code
+  async sendEmailVerificationCode() {
+    if (this.isSendingVerificationCode) return;
+
+    this.emailVerificationError = '';
+    this.emailVerificationSuccess = '';
+    this.isSendingVerificationCode = true;
+
+    try {
+      const sendCode = httpsCallable(this.functions, 'sendEmailVerificationCode');
+      const result = await sendCode({});
+      const data = result.data as any;
+
+      if (data.success) {
+        this.verificationCodeSent = true;
+        this.emailVerificationSuccess = 'Verification code sent to your email!';
+        this.showToast('Verification code sent to your email!', 'success');
+      } else {
+        this.emailVerificationError = data.error || 'Failed to send verification code.';
+        this.showToast(this.emailVerificationError, 'danger');
+      }
+    } catch (error: any) {
+      console.error('Failed to send verification code:', error);
+      // Handle Firebase function errors properly
+      const errorMessage = error.code === 'functions/internal'
+        ? 'Email service not configured. Please contact support.'
+        : error.message || 'Failed to send verification code. Please try again.';
+      this.emailVerificationError = errorMessage;
+      this.showToast(this.emailVerificationError, 'danger');
+    } finally {
+      this.isSendingVerificationCode = false;
+    }
+  }
+
+  // Verify email with code
+  async verifyEmailCode() {
+    if (this.isVerifyingEmail || !this.emailVerificationCode) return;
+
+    if (this.emailVerificationCode.length !== 6) {
+      this.emailVerificationError = 'Please enter a valid 6-digit code.';
+      return;
+    }
+
+    this.emailVerificationError = '';
+    this.emailVerificationSuccess = '';
+    this.isVerifyingEmail = true;
+
+    try {
+      const verifyCode = httpsCallable(this.functions, 'verifyEmailCode');
+      const result = await verifyCode({ code: this.emailVerificationCode });
+
+      if ((result.data as any).success) {
+        this.emailVerificationSuccess = 'Email verified successfully!';
+        this.showToast('Email verified successfully! You can now receive email notifications.', 'success');
+        this.verificationCodeSent = false;
+        this.emailVerificationCode = '';
+
+        // Update the current user object locally
+        if (this.currentUser) {
+          this.currentUser.emailVerified = true;
+        }
+      } else {
+        this.emailVerificationError = (result.data as any).message || 'Verification failed.';
+      }
+    } catch (error: any) {
+      console.error('Failed to verify email:', error);
+      this.emailVerificationError = error.message || 'Failed to verify email. Please try again.';
+      this.showToast(this.emailVerificationError, 'danger');
+    } finally {
+      this.isVerifyingEmail = false;
+    }
+  }
+
+  // Cancel verification
+  cancelEmailVerification() {
+    this.verificationCodeSent = false;
+    this.emailVerificationCode = '';
+    this.emailVerificationError = '';
+    this.emailVerificationSuccess = '';
   }
 }

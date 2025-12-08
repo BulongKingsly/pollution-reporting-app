@@ -1,0 +1,209 @@
+<!-- Report Card Component - Unified layout for Home and Admin pages -->
+<div class="card report-card border-0 shadow-sm mb-4">
+  <!-- Green Header with pollution type and status -->
+  <div class="card-header report-header d-flex justify-content-between align-items-center">
+    <div class="d-flex align-items-center">
+      <span class="badge pollution-type-badge me-2" [class]="getPollutionTypeClass()">
+        <i class="fas fa-{{ report().type === 'water' ? 'water' : report().type === 'air' ? 'wind' : 'mountain' }} me-1"></i>
+        {{ report().type | titlecase }} Pollution
+      </span>
+      <span class="badge status-badge" [class]="getStatusClass()">
+        <i class="fas {{ getStatusIcon() }} me-1"></i>
+        {{ report().status }}
+      </span>
+    </div>
+    @if (report().approved) {
+      <span class="badge bg-success-subtle text-success">
+        <i class="fas fa-check-circle me-1"></i>Approved
+      </span>
+    } @else {
+      <span class="badge bg-secondary">
+        <i class="fas fa-hourglass-half me-1"></i>Pending Approval
+      </span>
+    }
+  </div>
+
+  <div class="card-body">
+    <!-- Reporter Info -->
+    <div class="d-flex align-items-center mb-3">
+      @if (report().reporterProfilePic) {
+        <img [src]="report().reporterProfilePic"
+             alt="Reporter"
+             class="rounded-circle me-2 reporter-avatar">
+      } @else {
+        <div class="rounded-circle bg-success text-white d-flex align-items-center justify-content-center me-2 reporter-avatar-placeholder">
+          {{ getInitials(report().reporterName) }}
+        </div>
+      }
+      <div class="flex-grow-1">
+        <h6 class="mb-0 fw-semibold">{{ report().reporterName }}</h6>
+        <small class="text-muted">
+          <i class="fas fa-map-marker-alt me-1"></i>{{ report().location }}
+          <span class="mx-1">•</span>
+          {{ formatTimestamp(report().createdAt) | date:'short' }}
+        </small>
+      </div>
+    </div>
+
+    <!-- Image Gallery - Stack Layout -->
+    @if (report().images && report().images.length > 0) {
+      <div class="image-gallery mb-3">
+        <div class="image-stack">
+          @for (img of report().images; track $index) {
+            <div class="image-stack-item" [class.single]="report().images.length === 1">
+              <img [src]="img"
+                   class="img-fluid rounded report-image"
+                   [alt]="report().type + ' report image ' + ($index + 1)"
+                   [title]="'Click to view ' + report().type + ' report image'"
+                   (click)="onImageClick(img)"
+                   loading="lazy">
+            </div>
+          }
+        </div>
+      </div>
+    }
+
+    <!-- Description -->
+    <p class="card-text report-description">{{ report().description }}</p>
+
+    <!-- Location & Date Info -->
+    <div class="report-meta mb-3">
+      <small class="text-muted d-block">
+        <i class="fas fa-map-marker-alt me-1"></i>{{ report().location }}
+      </small>
+      <small class="text-muted">
+        <i class="fas fa-calendar me-1"></i>{{ report().date }} {{ report().time }}
+      </small>
+    </div>
+
+    <!-- Action Bar -->
+    <div class="d-flex align-items-center gap-3 border-top pt-3">
+      <button class="btn btn-sm btn-outline-success upvote-btn"
+              (click)="onUpvote()"
+              [disabled]="!canUpvote()">
+        <i class="fas fa-arrow-up me-1"></i>{{ report().upvotes || 0 }} Upvotes
+      </button>
+      <span class="text-muted small">
+        <i class="fas fa-comment me-1"></i>{{ (report().comments || []).length }} Responses
+      </span>
+    </div>
+
+    <!-- Map Display -->
+    @if (report().lat && report().lng) {
+      <div class="mt-3">
+        <h6 class="fw-semibold mb-2">
+          <i class="fas fa-map-marked-alt me-2 text-success"></i>Report Location
+        </h6>
+        <div [id]="'map-' + report().id" class="report-map-container"></div>
+        <button class="btn btn-sm btn-outline-primary mt-2" (click)="onShowMap()">
+          <i class="fas fa-map me-1"></i>Show Map
+        </button>
+      </div>
+    } @else {
+      <div class="mt-3">
+        <small class="text-muted">
+          <i class="fas fa-info-circle me-1"></i>Location coordinates not available for this report.
+        </small>
+      </div>
+    }
+
+    <!-- Admin Responses Section -->
+    @if ((report().comments || []).length > 0) {
+      <div class="mt-3 admin-responses">
+        <h6 class="fw-semibold mb-3">
+          <i class="fas fa-comments me-2 text-primary"></i>Admin Responses
+        </h6>
+        @for (comment of report().comments; track comment.id || $index) {
+          <div class="comment-item mb-3 p-3 bg-light rounded">
+            <div class="d-flex align-items-start">
+              @if (getUserProfilePicture(comment.userId); as commentPic) {
+                <img [src]="commentPic"
+                     alt="Commenter"
+                     class="rounded-circle me-2 comment-avatar">
+              } @else {
+                <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center me-2 comment-avatar-placeholder">
+                  {{ getInitials(comment.userName) }}
+                </div>
+              }
+              <div class="flex-grow-1">
+                <div class="d-flex align-items-center mb-1">
+                  <span class="fw-semibold me-2">{{ comment.userName }}</span>
+                  @if (comment.userRole === 'admin') {
+                    <span class="badge bg-primary">Admin</span>
+                  }
+                  <small class="text-muted ms-auto">{{ formatCommentDate(comment.createdAt) | date:'short' }}</small>
+                </div>
+                <p class="mb-0 small">{{ comment.text }}</p>
+              </div>
+            </div>
+          </div>
+        }
+      </div>
+    }
+
+    <!-- Admin Response -->
+    @if (report().adminResponse; as adminResponse) {
+      <div class="mt-3 p-3 bg-light rounded admin-response-legacy">
+        <div class="d-flex align-items-start">
+          <i class="fas fa-user-shield text-primary me-2"></i>
+          <div>
+            <h6 class="mb-1 fw-semibold text-primary">Barangay Admin Response</h6>
+            <p class="mb-1 small">{{ adminResponse.text }}</p>
+            <small class="text-muted">Responded {{ adminResponse.date }}</small>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- Add Comment Section (Admin Only) -->
+    @if (isAdmin() && showAdminActions()) {
+      <div class="mt-3 add-comment-section">
+        <h6 class="fw-semibold mb-2">
+          <i class="fas fa-plus-circle me-2 text-success"></i>Add Admin Response
+        </h6>
+        <div class="input-group">
+          <textarea class="form-control"
+                    rows="2"
+                    placeholder="Enter your response..."
+                    [(ngModel)]="commentText"></textarea>
+        </div>
+        <button class="btn btn-primary btn-sm mt-2" (click)="onAddComment()" [disabled]="!commentText.trim()">
+          <i class="fas fa-paper-plane me-1"></i>Submit Response
+        </button>
+      </div>
+
+      <!-- Admin Actions -->
+      <div class="mt-3 admin-actions">
+        <div class="row g-2">
+          <div class="col-md-6">
+            <label class="form-label fw-medium">Update Status</label>
+            <select class="form-select form-select-sm"
+                    title="Update report status"
+                    [value]="report().status"
+                    (change)="onStatusChange($any($event.target).value)">
+              <option value="Pending">Pending</option>
+              <option value="In Progress">In Progress</option>
+              <option value="Done">Done</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-medium">Actions</label>
+            <div class="d-flex gap-2">
+              @if (!report().approved) {
+                <button class="btn btn-sm btn-success" (click)="onApprove()">
+                  <i class="fas fa-check me-1"></i>Approve
+                </button>
+                <button class="btn btn-sm btn-outline-danger" (click)="onReject()">
+                  <i class="fas fa-times me-1"></i>Reject
+                </button>
+              }
+              <button class="btn btn-sm btn-outline-danger" (click)="onDelete()">
+                <i class="fas fa-trash me-1"></i>Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    }
+  </div>
+</div>

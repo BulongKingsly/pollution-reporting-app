@@ -60,7 +60,7 @@ export class SignUp {
       this.successMessage = 'Account created successfully! Redirecting to home...';
 
       // Redirect after short delay
-      setTimeout(() => this.router.navigate(['/home']), 1500);
+      setTimeout(() => this.router.navigate(['/']), 1500);
 
     } catch (error: any) {
       this.errorMessage = error.message || 'Registration failed';

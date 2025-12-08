@@ -1,13 +1,14 @@
-import { Component, OnInit, AfterViewInit } from '@angular/core';
+import { Component, OnInit, AfterViewInit, ViewChild, ElementRef, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { RouterLink, RouterLinkActive } from '@angular/router';
 import { ReportsService } from '../services/reports';
 import { AnnouncementsService } from '../services/announcements';
 import { UsersService } from '../services/users';
 import { BarangaysService, Barangay } from '../services/barangays.service';
 import { AuthService } from '../services/auth-guard';
 import { Firestore, collectionData, collection, doc, deleteDoc } from '@angular/fire/firestore';
+import { Functions, httpsCallable } from '@angular/fire/functions';
 import { Observable, firstValueFrom } from 'rxjs';
 import { take } from 'rxjs/operators';
 import { AppUser, Report, Announcement } from '../interfaces';
@@ -15,15 +16,18 @@ import { Router } from '@angular/router';
 import * as L from 'leaflet';
 import { TranslatePipe } from '../pipes/translate.pipe';
 import { TranslationService } from '../services/translation.service';
+import { NotificationService } from '../services/notification.service';
+import { NotificationsService } from '../services/notifications.service';
+import Chart from 'chart.js/auto';
 
 @Component({
   selector: 'app-admin-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, TranslatePipe],
+  imports: [CommonModule, FormsModule, RouterLink, RouterLinkActive, TranslatePipe],
   templateUrl: './admin-dashboard.html',
   styleUrls: ['./admin-dashboard.css']
 })
-export class AdminDashboard implements OnInit, AfterViewInit {
+export class AdminDashboard implements OnInit, AfterViewInit, OnDestroy {
   activeTab: 'reports' | 'announcements' | 'users' | 'analytics' | 'barangays' | 'tasks' = 'reports';
 
   reports: (Report & { id?: string })[] = [];
@@ -32,7 +36,7 @@ export class AdminDashboard implements OnInit, AfterViewInit {
   barangays: (Barangay & { id?: string })[] = [];
   user$: Observable<AppUser | null>;
 
-  filterStatus: 'all' | 'Pending' | 'In Progress' | 'Done' = 'all';
+  filterStatus: 'all' | 'In Progress' | 'Done' = 'all';
   responseText: Record<string, string> = {};
 
   // Comment tracking
@@ -47,6 +51,9 @@ export class AdminDashboard implements OnInit, AfterViewInit {
   // Go to top button visibility
   showGoToTop = false;
 
+  // Unread notifications count
+  unreadNotificationCount = 0;
+
   announcementModel: Partial<Announcement> = {
     title: '',
     subtitle: '',
@@ -58,22 +65,28 @@ export class AdminDashboard implements OnInit, AfterViewInit {
     private reportsService: ReportsService,
     private announcementsService: AnnouncementsService,
     private firestore: Firestore,
+    private functions: Functions,
     private usersService: UsersService,
     private barangaysService: BarangaysService,
     private auth: AuthService,
-    private router: Router
+    private router: Router,
+    private notify: NotificationService,
+    private notificationsService: NotificationsService
   ) {
     this.user$ = this.auth.user$;
+    // Load unread notification count
+    this.user$.subscribe(user => {
+      if (user) {
+        this.notificationsService.getUnreadCount(user.uid).subscribe(count => {
+          this.unreadNotificationCount = count;
+        });
+      }
+    });
   }
 
-  // UI toasts and confirm dialog state (simple per-component implementation)
+  // UI toasts state (simple per-component implementation)
   toasts: Array<{ id: number; message: string; type: 'info' | 'success' | 'warning' | 'danger' }> = [];
   private nextToastId = 1;
-
-  // confirm dialog
-  confirmVisible = false;
-  confirmMessage = '';
-  private confirmResolve: ((v: boolean) => void) | null = null;
 
   showToast(message: string, type: 'info' | 'success' | 'warning' | 'danger' = 'info') {
     const id = this.nextToastId++;
@@ -85,20 +98,8 @@ export class AdminDashboard implements OnInit, AfterViewInit {
     this.toasts = this.toasts.filter(t => t.id !== id);
   }
 
-  showConfirm(message: string): Promise<boolean> {
-    this.confirmMessage = message;
-    this.confirmVisible = true;
-    return new Promise(resolve => { this.confirmResolve = resolve; });
-  }
-
-  onConfirmAnswer(answer: boolean) {
-    this.confirmVisible = false;
-    if (this.confirmResolve) this.confirmResolve(answer);
-    this.confirmResolve = null;
-  }
-
   goHome() {
-    this.router.navigate(['/home']);
+    this.router.navigate(['/']);
   }
 
   ngOnInit(): void {
@@ -110,13 +111,47 @@ export class AdminDashboard implements OnInit, AfterViewInit {
     this.loadBarangays();
     this.auth.user$.pipe(take(1)).subscribe((u: any) => {
       this.isMainAdmin = !!u && (u.role === 'admin') && (!u.barangay || u.barangay === '');
+      this.currentUserId = u?.uid || '';
     });
   }
 
   isMainAdmin = false;
+  currentUserId = ''; // Store current user's ID to exclude from users list
+
+  // Barangay filter for main admin - separate filters for each section
+  selectedBarangayFilter = ''; // Reports filter
+  selectedUsersBarangayFilter = ''; // Users filter
+  selectedTasksBarangayFilter = ''; // Submitted reports filter
+  selectedAnnouncementsBarangayFilter = ''; // Announcements filter
+  selectedAnalyticsBarangayFilter = ''; // Analytics filter
+
+  // Analytics chart references
+  @ViewChild('analyticsBarCanvas', { static: false }) analyticsBarCanvas!: ElementRef<HTMLCanvasElement>;
+  @ViewChild('analyticsPieCanvas', { static: false }) analyticsPieCanvas!: ElementRef<HTMLCanvasElement>;
+  private analyticsBarChart: Chart | null = null;
+  private analyticsPieChart: Chart | null = null;
+
+  // Analytics data
+  analyticsPollutionTypes: string[] = [];
+  analyticsCountsByType: Record<string, number> = {};
+  analyticsLast7Days: { label: string; count: number }[] = [];
 
   setTab(tab: 'reports' | 'announcements' | 'users' | 'analytics' | 'barangays' | 'tasks') {
     this.activeTab = tab;
+    if (tab === 'analytics') {
+      this.loadAnalyticsData();
+    }
+  }
+
+  /** Handle barangay filter change */
+  onBarangayFilterChange() {
+    // The filteredReports() method will automatically filter based on selectedBarangayFilter
+    // No additional action needed as we use getters
+  }
+
+  /** Get count of reports for the selected barangay filter */
+  getFilteredReportsCount(): number {
+    return this.filteredReports().length;
   }
 
   // --- Reports ---
@@ -139,23 +174,48 @@ export class AdminDashboard implements OnInit, AfterViewInit {
   }
 
   filteredReports() {
-    const approvedReports = this.reports.filter(r => r.approved === true);
+    let approvedReports = this.reports.filter(r => r.approved === true);
+
+    // Apply barangay filter if selected (main admin only)
+    if (this.selectedBarangayFilter) {
+      approvedReports = approvedReports.filter(r => r.barangayId === this.selectedBarangayFilter);
+    }
+
     if (this.filterStatus === 'all') return approvedReports;
     return approvedReports.filter(r => r.status === this.filterStatus);
   }
 
-  /** Get reports pending approval (not approved yet) */
+  /** Get reports pending approval (not approved yet), with optional barangay filter */
   getPendingReports(): (Report & { id?: string })[] {
-    return this.reports.filter(r => r.approved === false || r.approved === undefined || r.approved === null);
+    let pending = this.reports.filter(r => r.approved === false || r.approved === undefined || r.approved === null);
+
+    // Apply barangay filter if selected (main admin only)
+    if (this.selectedTasksBarangayFilter) {
+      pending = pending.filter(r => r.barangayId === this.selectedTasksBarangayFilter);
+    }
+
+    return pending;
   }
 
-  /** Get count of pending approvals for badge */
+  /** Get count of all pending approvals for badge (unfiltered) */
   getPendingApprovalCount(): number {
-    return this.getPendingReports().length;
+    return this.reports.filter(r => r.approved === false || r.approved === undefined || r.approved === null).length;
   }
 
-  async updateStatus(report: Report & { id?: string }, status: 'Pending' | 'In Progress' | 'Done') {
+  async updateStatus(report: Report & { id?: string }, status: 'In Progress' | 'Done') {
     if (!report.id) return;
+
+    // If setting to Done, show confirmation since it's permanent
+    if (status === 'Done') {
+      const confirmed = await this.notify.confirm(
+        'Are you sure you want to mark this report as Done? This action is permanent and cannot be undone.',
+        'Mark as Done',
+        'Yes, Mark Done',
+        'Cancel'
+      );
+      if (!confirmed) return;
+    }
+
     try {
       await this.reportsService.updateReport(report.id, { status });
       const idx = this.reports.findIndex(r => r.id === report.id);
@@ -178,7 +238,7 @@ export class AdminDashboard implements OnInit, AfterViewInit {
 
   async deleteReport(report: Report & { id?: string }) {
     if (!report.id) return;
-    const confirmed = await this.showConfirm('Are you sure you want to delete this report? This will also delete all associated images.');
+    const confirmed = await this.notify.confirm('Are you sure you want to delete this report? This will also delete all associated images.', 'Delete Report', 'Yes, Delete', 'Cancel');
     if (!confirmed) return;
 
     try {
@@ -191,13 +251,14 @@ export class AdminDashboard implements OnInit, AfterViewInit {
     }
   }
 
-  /** Approve a report to make it visible on home page */
+  /** Approve a report - sets it to In Progress and makes it visible on home page */
   async approveReport(report: Report & { id?: string }) {
     if (!report.id) return;
     try {
-      await this.reportsService.updateReport(report.id, { approved: true });
+      await this.reportsService.updateReport(report.id, { approved: true, status: 'In Progress' });
       report.approved = true;
-      this.showToast('Report approved and will now appear on home page', 'success');
+      report.status = 'In Progress';
+      this.showToast('Report approved and is now In Progress', 'success');
     } catch (err) {
       console.error('Failed to approve report', err);
       this.showToast('Failed to approve report: ' + ((err as any)?.message || ''), 'danger');
@@ -217,7 +278,36 @@ export class AdminDashboard implements OnInit, AfterViewInit {
     }
   }
 
-  // --- Announcements ---
+  /** Reject a report with a reason and send notification to reporter */
+  async rejectReport(report: Report & { id?: string }) {
+    if (!report.id) return;
+
+    // Prompt for rejection reason
+    const reason = await this.notify.prompt('Please provide a reason for rejecting this report:', 'Reject Report', 'Not related to pollution', 'Enter reason...', 'Reject', 'Cancel');
+    if (reason === null) return; // User cancelled
+
+    try {
+      // Call Firebase Cloud Function to send rejection email notification
+      const rejectFunc = httpsCallable(this.functions, 'onReportRejection');
+
+      await rejectFunc({
+        reportId: report.id,
+        reporterId: report.reporterId,
+        reportLocation: report.location || 'Unknown',
+        reportType: report.type || 'Unknown',
+        reason: reason
+      });
+
+      // Delete the report after rejecting
+      await this.reportsService.deleteReport(report.id);
+      this.reports = this.reports.filter(r => r.id !== report.id);
+
+      this.showToast('Report rejected, notification sent, and report deleted', 'success');
+    } catch (err) {
+      console.error('Failed to reject report', err);
+      this.showToast('Failed to reject report: ' + ((err as any)?.message || ''), 'danger');
+    }
+  }  // --- Announcements ---
   loadAnnouncements() {
     this.auth.user$.pipe(take(1)).subscribe((currentUser: any) => {
       const isGlobalAdmin = currentUser?.role === 'admin' && (!currentUser.barangay || currentUser.barangay === '');
@@ -256,15 +346,60 @@ export class AdminDashboard implements OnInit, AfterViewInit {
   }
 
   /** Create a new barangay */
-  async createBarangay(name: string) {
+  async createBarangay(name: string, lat?: number, lng?: number) {
     if (!name || !name.trim()) { this.showToast('Provide barangay name', 'warning'); return; }
     try {
-      await this.barangaysService.createBarangay({ name: name.trim() });
+      // Fetch boundary from OSM if lat/lng provided
+      let boundary: number[][] | undefined;
+      if (lat != null && lng != null) {
+        boundary = await this.fetchBarangayBoundary(name.trim());
+      }
+      await this.barangaysService.createBarangay({
+        name: name.trim(),
+        lat: lat != null ? lat : undefined,
+        lng: lng != null ? lng : undefined,
+        boundary
+      });
       this.loadBarangays();
       this.showToast('Barangay created', 'success');
     } catch (err) {
       console.error('Failed to create barangay', err);
       this.showToast('Failed to create barangay', 'danger');
+    }
+  }
+
+  /** Fetch barangay boundary polygon from OpenStreetMap Nominatim */
+  async fetchBarangayBoundary(barangayName: string): Promise<number[][] | undefined> {
+    try {
+      // Search for barangay in Baguio City, Philippines
+      const query = encodeURIComponent(`${barangayName}, Baguio City, Philippines`);
+      const url = `https://nominatim.openstreetmap.org/search?q=${query}&format=json&polygon_geojson=1&limit=1`;
+
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'PollutionReportingApp/1.0'
+        }
+      });
+
+      if (!response.ok) {
+        console.warn('Failed to fetch boundary from OSM');
+        return undefined;
+      }
+
+      const data = await response.json();
+      if (data.length > 0 && data[0].geojson) {
+        const geojson = data[0].geojson;
+        if (geojson.type === 'Polygon') {
+          return geojson.coordinates[0]; // Return outer ring
+        } else if (geojson.type === 'MultiPolygon') {
+          return geojson.coordinates[0][0]; // Return first polygon's outer ring
+        }
+      }
+      console.warn('No boundary found for', barangayName);
+      return undefined;
+    } catch (err) {
+      console.error('Error fetching boundary:', err);
+      return undefined;
     }
   }
 
@@ -286,23 +421,24 @@ export class AdminDashboard implements OnInit, AfterViewInit {
 
   /** Remove an admin from a barangay and downgrade role */
   async unassignAdminFromBarangay(barangayId: string, adminUid: string) {
-    if (!confirm('Remove admin privileges from this user?')) return;
+    const confirmed = await this.notify.confirm('Remove admin privileges from this user?', 'Remove Admin');
+    if (!confirmed) return;
     try {
       await this.barangaysService.removeAdmin(barangayId, adminUid);
       // downgrade user role to 'user' and clear barangay assignment
       await this.usersService.updateRole(adminUid, 'user');
       await this.usersService.setUserBarangay(adminUid, null);
-      alert('Admin removed');
+      this.notify.success('Admin removed successfully', 'Success');
       this.loadUsers();
       this.loadBarangays();
     } catch (err) {
       console.error('Failed to remove admin', err);
-      alert('Failed to remove admin');
+      this.notify.error('Failed to remove admin', 'Error');
     }
   }
 
   async removeBarangay(barangayId: string) {
-    const ok = await this.showConfirm('Delete this barangay? This action cannot be undone.');
+    const ok = await this.notify.confirm('Delete this barangay? This action cannot be undone.', 'Delete Barangay', 'Yes, Delete', 'Cancel');
     if (!ok) return;
     try {
       await this.barangaysService.deleteBarangay(barangayId);
@@ -314,10 +450,10 @@ export class AdminDashboard implements OnInit, AfterViewInit {
     }
   }
 
-  /** Navigate to barangay-scoped analytics */
+  /** Navigate to main analytics page with the barangay pre-selected */
   openBarangayAnalytics(barangayId: string) {
     if (!barangayId) return;
-    this.router.navigate(['/admin/barangay', barangayId, 'analytics']);
+    this.router.navigate(['/analytics'], { queryParams: { barangay: barangayId } });
   }
 
   /** Users that can be assigned as admins (non-admins) */
@@ -445,8 +581,11 @@ export class AdminDashboard implements OnInit, AfterViewInit {
         // Check if this barangay already has an admin
         const existingAdmins = this.getBarangayAdmins(user.barangay);
         if (existingAdmins.length > 0 && !existingAdmins.some(a => a.uid === user.uid)) {
-          const confirmed = await this.showConfirm(
-            `${user.barangay} already has an admin (${existingAdmins[0].username || existingAdmins[0].email}). Only 1 admin per barangay is allowed. Replace with ${user.username || user.email}?`
+          const confirmed = await this.notify.confirm(
+            `${user.barangay} already has an admin (${existingAdmins[0].username || existingAdmins[0].email}). Only 1 admin per barangay is allowed. Replace with ${user.username || user.email}?`,
+            'Replace Admin',
+            'Yes, Replace',
+            'Cancel'
           );
           if (!confirmed) return;
 
@@ -516,7 +655,7 @@ export class AdminDashboard implements OnInit, AfterViewInit {
       }
     }
 
-    const confirmed = await this.showConfirm(`Are you sure you want to ${action} ${user.email}?`);
+    const confirmed = await this.notify.confirm(`Are you sure you want to ${action} ${user.email}?`, `${action.charAt(0).toUpperCase() + action.slice(1)} User`, `Yes, ${action}`, 'Cancel');
     if (!confirmed) return;
 
     try {
@@ -558,7 +697,7 @@ export class AdminDashboard implements OnInit, AfterViewInit {
       }
     }
 
-    const confirmed = await this.showConfirm(`⚠️ PERMANENTLY DELETE ${user.email}? This action cannot be undone!`);
+    const confirmed = await this.notify.confirm(`⚠️ PERMANENTLY DELETE ${user.email}? This action cannot be undone!`, 'Delete User', 'Yes, Delete', 'Cancel');
     if (!confirmed) return;
 
     try {
@@ -578,33 +717,178 @@ export class AdminDashboard implements OnInit, AfterViewInit {
       const announcementDoc = doc(this.firestore, `announcements/${a.id}`);
       await deleteDoc(announcementDoc);
       this.announcements = this.announcements.filter(x => x.id !== a.id);
+      this.notify.success('Announcement deleted', 'Success');
     } catch (err) {
       console.error('Failed to delete announcement', err);
-      alert('Failed to delete announcement');
+      this.notify.error('Failed to delete announcement', 'Error');
     }
+  }
+
+  // --- Analytics Methods ---
+
+  /** Handle analytics barangay filter change */
+  onAnalyticsBarangayFilterChange() {
+    this.loadAnalyticsData();
+  }
+
+  /** Load and calculate analytics data */
+  loadAnalyticsData() {
+    // Filter reports based on selected barangay
+    let filteredReports = this.reports.filter(r => r.approved === true);
+    if (this.selectedAnalyticsBarangayFilter) {
+      filteredReports = filteredReports.filter(r => r.barangayId === this.selectedAnalyticsBarangayFilter);
+    }
+
+    // Extract unique pollution types
+    const typeSet = new Set<string>();
+    filteredReports.forEach(r => {
+      const t = (r.type || '').toLowerCase();
+      if (t) typeSet.add(t);
+    });
+    this.analyticsPollutionTypes = Array.from(typeSet).sort();
+
+    // Initialize counts for all types
+    this.analyticsCountsByType = {};
+    this.analyticsPollutionTypes.forEach(type => {
+      this.analyticsCountsByType[type] = 0;
+    });
+
+    // Calculate last 7 days
+    const byDay: Record<string, number> = {};
+    const today = new Date();
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(today.getDate() - i);
+      const key = d.toISOString().slice(0, 10);
+      byDay[key] = 0;
+    }
+
+    filteredReports.forEach(r => {
+      const t = (r.type || '').toLowerCase();
+      if (t && this.analyticsCountsByType.hasOwnProperty(t)) {
+        this.analyticsCountsByType[t]++;
+      }
+
+      // Normalize createdAt
+      let created: Date | null = null;
+      if (r.createdAt && typeof (r.createdAt as any).toDate === 'function') {
+        created = (r.createdAt as any).toDate();
+      } else if (r.createdAt instanceof Date) {
+        created = r.createdAt as Date;
+      } else if (r.createdAt) {
+        created = new Date(r.createdAt as any);
+      }
+
+      if (created) {
+        const k = created.toISOString().slice(0, 10);
+        if (k in byDay) byDay[k]++;
+      }
+    });
+
+    this.analyticsLast7Days = Object.keys(byDay).map(k => ({ label: k.slice(5), count: byDay[k] }));
+
+    // Update charts after a short delay to ensure DOM is ready
+    setTimeout(() => this.updateAnalyticsCharts(), 100);
+  }
+
+  /** Update analytics charts */
+  private updateAnalyticsCharts() {
+    try {
+      const labels = this.analyticsLast7Days.map(d => d.label);
+      const data = this.analyticsLast7Days.map(d => d.count);
+
+      // Bar chart
+      if (!this.analyticsBarChart && this.analyticsBarCanvas?.nativeElement) {
+        this.analyticsBarChart = new Chart(this.analyticsBarCanvas.nativeElement.getContext('2d')!, {
+          type: 'bar',
+          data: { labels: labels, datasets: [{ label: 'Reports', data: data, backgroundColor: '#0d6efd' }] },
+          options: { responsive: true, maintainAspectRatio: false }
+        });
+      } else if (this.analyticsBarChart) {
+        this.analyticsBarChart.data.labels = labels;
+        this.analyticsBarChart.data.datasets[0].data = data;
+        this.analyticsBarChart.update();
+      }
+
+      // Pie chart
+      const pieLabels = this.analyticsPollutionTypes.map(t => t.charAt(0).toUpperCase() + t.slice(1));
+      const pieData = this.analyticsPollutionTypes.map(t => this.analyticsCountsByType[t] || 0);
+      const colors = ['#198754', '#0dcaf0', '#ffc107', '#dc3545', '#6610f2', '#fd7e14', '#20c997', '#6c757d'];
+
+      if (!this.analyticsPieChart && this.analyticsPieCanvas?.nativeElement) {
+        this.analyticsPieChart = new Chart(this.analyticsPieCanvas.nativeElement.getContext('2d')!, {
+          type: 'pie',
+          data: { labels: pieLabels, datasets: [{ data: pieData, backgroundColor: colors.slice(0, pieLabels.length) }] },
+          options: { responsive: true, maintainAspectRatio: false }
+        });
+      } else if (this.analyticsPieChart) {
+        this.analyticsPieChart.data.labels = pieLabels;
+        this.analyticsPieChart.data.datasets[0].data = pieData;
+        this.analyticsPieChart.data.datasets[0].backgroundColor = colors.slice(0, pieLabels.length);
+        this.analyticsPieChart.update();
+      }
+    } catch (e) {
+      console.warn('Chart init failed', e);
+    }
+  }
+
+  /** Get analytics total reports (filtered) */
+  get analyticsTotalReports(): number {
+    let filtered = this.reports.filter(r => r.approved === true);
+    if (this.selectedAnalyticsBarangayFilter) {
+      filtered = filtered.filter(r => r.barangayId === this.selectedAnalyticsBarangayFilter);
+    }
+    return filtered.length;
+  }
+
+  /** Get analytics in progress count (filtered) */
+  get analyticsInProgressCount(): number {
+    let filtered = this.reports.filter(r => r.approved === true && r.status === 'In Progress');
+    if (this.selectedAnalyticsBarangayFilter) {
+      filtered = filtered.filter(r => r.barangayId === this.selectedAnalyticsBarangayFilter);
+    }
+    return filtered.length;
+  }
+
+  /** Get analytics done count (filtered) */
+  get analyticsDoneCount(): number {
+    let filtered = this.reports.filter(r => r.approved === true && r.status === 'Done');
+    if (this.selectedAnalyticsBarangayFilter) {
+      filtered = filtered.filter(r => r.barangayId === this.selectedAnalyticsBarangayFilter);
+    }
+    return filtered.length;
   }
 
   // Analytics helpers used in template
   get totalReports() {
-    return this.reports?.length || 0;
+    return this.reports?.filter(r => r.approved === true).length || 0;
   }
 
-  get pendingCount() {
-    return this.reports?.filter(r => r.status === 'Pending').length || 0;
+  get pendingApprovalCount() {
+    return this.reports?.filter(r => r.approved === false || r.approved === undefined || r.approved === null).length || 0;
   }
 
   get inProgressCount() {
-    return this.reports?.filter(r => r.status === 'In Progress').length || 0;
+    return this.reports?.filter(r => r.approved === true && r.status === 'In Progress').length || 0;
   }
 
   get doneCount() {
-    return this.reports?.filter(r => r.status === 'Done').length || 0;
+    return this.reports?.filter(r => r.approved === true && r.status === 'Done').length || 0;
   }
 
-  // Group users by barangay (for main admin display)
+  // Group users by barangay (for main admin display), excluding the current admin
   get usersByBarangay(): Record<string, AppUser[]> {
     const grouped: Record<string, AppUser[]> = {};
-    this.users.forEach(u => {
+
+    // Filter out the current admin from the users list
+    let filteredUsers = this.users.filter(u => u.uid !== this.currentUserId);
+
+    // Apply barangay filter if selected
+    if (this.selectedUsersBarangayFilter) {
+      filteredUsers = filteredUsers.filter(u => u.barangay === this.selectedUsersBarangayFilter);
+    }
+
+    filteredUsers.forEach(u => {
       let barangayName = 'Admin';
 
       if (u.barangay) {
@@ -617,6 +901,20 @@ export class AdminDashboard implements OnInit, AfterViewInit {
       grouped[barangayName].push(u);
     });
     return grouped;
+  }
+
+  /** Get filtered users count for display */
+  getFilteredUsersCount(): number {
+    let count = 0;
+    for (const key of Object.keys(this.usersByBarangay)) {
+      count += this.usersByBarangay[key].length;
+    }
+    return count;
+  }
+
+  /** Get users for barangay admin view (excludes themselves) */
+  get filteredUsersForBarangayAdmin(): AppUser[] {
+    return this.users.filter(u => u.uid !== this.currentUserId);
   }
 
   // Get barangay names for users grouping
@@ -632,7 +930,19 @@ export class AdminDashboard implements OnInit, AfterViewInit {
   // Group announcements by barangay (for main admin display)
   get announcementsByBarangay(): Record<string, (Announcement & { id?: string })[]> {
     const grouped: Record<string, (Announcement & { id?: string })[]> = {};
-    this.announcements.forEach(a => {
+
+    // Apply barangay filter if selected
+    let filteredAnnouncements = this.announcements;
+    if (this.selectedAnnouncementsBarangayFilter) {
+      // Filter by specific barangay, or show global if 'global' is selected
+      if (this.selectedAnnouncementsBarangayFilter === 'global') {
+        filteredAnnouncements = this.announcements.filter(a => !a.barangayId);
+      } else {
+        filteredAnnouncements = this.announcements.filter(a => a.barangayId === this.selectedAnnouncementsBarangayFilter);
+      }
+    }
+
+    filteredAnnouncements.forEach(a => {
       let barangayName = 'Global';
 
       if (a.barangayId) {
@@ -645,6 +955,15 @@ export class AdminDashboard implements OnInit, AfterViewInit {
       grouped[barangayName].push(a);
     });
     return grouped;
+  }
+
+  /** Get filtered announcements count for display */
+  getFilteredAnnouncementsCount(): number {
+    let count = 0;
+    for (const key of Object.keys(this.announcementsByBarangay)) {
+      count += this.announcementsByBarangay[key].length;
+    }
+    return count;
   }
 
   // Get barangay names for announcements grouping
@@ -742,20 +1061,20 @@ export class AdminDashboard implements OnInit, AfterViewInit {
 
   async addCommentToReport(reportId: string): Promise<void> {
     if (!reportId) {
-      alert('Invalid report ID');
+      this.notify.error('Invalid report ID', 'Error');
       console.error('Report ID is missing');
       return;
     }
 
     const user = await firstValueFrom(this.user$.pipe(take(1)));
     if (!user || user.role !== 'admin') {
-      alert('Only admins can add comments');
+      this.notify.warning('Only admins can add comments', 'Not Allowed');
       return;
     }
 
     const commentText = this.commentTexts[reportId]?.trim();
     if (!commentText) {
-      alert('Please enter a comment');
+      this.notify.warning('Please enter a comment', 'Empty Comment');
       return;
     }
 
@@ -775,10 +1094,10 @@ export class AdminDashboard implements OnInit, AfterViewInit {
       // Reload reports to show new comment
       await this.loadReports();
 
-      alert('Comment added successfully');
+      this.notify.success('Comment added successfully', 'Success');
     } catch (err) {
       console.error('Failed to add comment', err);
-      alert('Failed to add comment: ' + (err as Error).message);
+      this.notify.error('Failed to add comment: ' + (err as Error).message, 'Error');
     }
   }
 
@@ -831,5 +1150,9 @@ export class AdminDashboard implements OnInit, AfterViewInit {
 
   handleScroll() {
     this.showGoToTop = window.scrollY > 300;
+  }
+
+  ngOnDestroy(): void {
+    window.removeEventListener('scroll', this.handleScroll.bind(this));
   }
 }

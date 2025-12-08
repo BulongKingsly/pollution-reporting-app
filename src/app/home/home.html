@@ -1,7 +1,7 @@
 <!-- Navigation -->
 <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm sticky-top">
   <div class="container-fluid">
-    <a class="navbar-brand fw-bold text-success" routerLink="/home">
+    <a class="navbar-brand fw-bold text-success" routerLink="/">
       <i class="fas fa-leaf me-2"></i>Pollution Report
     </a>
 
@@ -11,19 +11,24 @@
 
     <div class="collapse navbar-collapse" id="navbarNav">
       <ul class="navbar-nav ms-auto align-items-center">
-        <li class="nav-item"><a class="nav-link active" routerLink="/home"><i class="fas fa-home me-1"></i> Home</a></li>
-        <li class="nav-item"><a class="nav-link" routerLink="/help"><i class="fas fa-question-circle me-1"></i> Help</a></li>
+        <li class="nav-item"><a class="nav-link active" routerLink="/"><i class="fas fa-home me-1"></i> Home</a></li>
+        <li class="nav-item" *ngIf="(user$ | async)?.role !== 'admin'"><a class="nav-link" routerLink="/help"><i class="fas fa-question-circle me-1"></i> Help</a></li>
         <li class="nav-item" *ngIf="user$ | async as user">
           <a class="nav-link" routerLink="/settings"><i class="fas fa-cog me-1"></i> Settings</a>
         </li>
         <li class="nav-item" *ngIf="(user$ | async)?.role === 'admin'">
-          <a class="nav-link" routerLink="/admin"><i class="fas fa-shield-alt me-1"></i> Admin</a>
+          <a class="nav-link d-flex align-items-center" routerLink="/admin">
+            <i class="fas fa-shield-alt me-1"></i> Admin
+            @if (adminPendingApprovalCount() > 0) {
+              <span class="badge bg-danger ms-1 notification-badge">{{ adminPendingApprovalCount() > 99 ? '99+' : adminPendingApprovalCount() }}</span>
+            }
+          </a>
         </li>
-        <li class="nav-item ms-lg-3" *ngIf="user$ | async">
+        <li class="nav-item ms-lg-3" *ngIf="(user$ | async) && (user$ | async)?.role !== 'admin'">
           <a class="btn btn-success" routerLink="/submit-report"><i class="fas fa-plus me-1"></i> New Report</a>
         </li>
         <li class="nav-item dropdown ms-lg-2" *ngIf="user$ | async as user">
-          <a class="nav-link dropdown-toggle d-flex align-items-center" data-bs-toggle="dropdown">
+          <a class="nav-link dropdown-toggle d-flex align-items-center position-relative" data-bs-toggle="dropdown">
             <img *ngIf="user.profilePictureUrl; else userIcon"
                  [src]="user.profilePictureUrl"
                  alt="Profile"
@@ -35,9 +40,20 @@
                 {{ (user.fullName || user.email || 'U').charAt(0).toUpperCase() }}
               </div>
             </ng-template>
+            @if (unreadNotificationCount() > 0) {
+              <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger profile-notification-badge">{{ unreadNotificationCount() > 9 ? '9+' : unreadNotificationCount() }}</span>
+            }
           </a>
           <ul class="dropdown-menu dropdown-menu-end">
             <li><a class="dropdown-item" routerLink="/profile"><i class="fas fa-user me-2"></i>My Profile</a></li>
+            <li>
+              <a class="dropdown-item d-flex justify-content-between align-items-center" routerLink="/notifications">
+                <span><i class="fas fa-bell me-2"></i>Notifications</span>
+                @if (unreadNotificationCount() > 0) {
+                  <span class="badge bg-danger rounded-pill">{{ unreadNotificationCount() > 99 ? '99+' : unreadNotificationCount() }}</span>
+                }
+              </a>
+            </li>
             <li><a class="dropdown-item" routerLink="/settings"><i class="fas fa-cog me-2"></i>Settings</a></li>
             <li><hr class="dropdown-divider"></li>
             <li><a class="dropdown-item text-danger" (click)="logout()"><i class="fas fa-sign-out-alt me-2"></i>Logout</a></li>
@@ -62,6 +78,61 @@
       <p class="mb-0">Please <a routerLink="/login" class="alert-link fw-bold">login</a> or <a routerLink="/sign-up" class="alert-link fw-bold">create an account</a> to submit reports, upvote, and interact with the community.</p>
     </div>
   </div>
+
+  <!-- Admin Statistics Cards (visible only for admins) -->
+  @if (isAdmin()) {
+    <div class="row g-3 mb-4">
+      <div class="col-12">
+        <h5 class="fw-bold text-success mb-3">
+          <i class="fas fa-chart-pie me-2"></i>Reports Overview
+        </h5>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card stat-card bg-light border-0 h-100">
+          <div class="card-body text-center py-3">
+            <div class="stat-icon mb-2">
+              <i class="fas fa-file-alt fa-2x text-primary"></i>
+            </div>
+            <h3 class="mb-0 fw-bold text-primary">{{ adminTotalReports() }}</h3>
+            <small class="text-muted">Total Reports</small>
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card stat-card bg-warning bg-opacity-10 border-0 h-100">
+          <div class="card-body text-center py-3">
+            <div class="stat-icon mb-2">
+              <i class="fas fa-hourglass-half fa-2x text-warning"></i>
+            </div>
+            <h3 class="mb-0 fw-bold text-warning">{{ adminPendingApprovalCount() }}</h3>
+            <small class="text-muted">Awaiting Approval</small>
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card stat-card bg-info bg-opacity-10 border-0 h-100">
+          <div class="card-body text-center py-3">
+            <div class="stat-icon mb-2">
+              <i class="fas fa-spinner fa-2x text-info"></i>
+            </div>
+            <h3 class="mb-0 fw-bold text-info">{{ adminInProgressCount() }}</h3>
+            <small class="text-muted">In Progress</small>
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="card stat-card bg-success bg-opacity-10 border-0 h-100">
+          <div class="card-body text-center py-3">
+            <div class="stat-icon mb-2">
+              <i class="fas fa-check-circle fa-2x text-success"></i>
+            </div>
+            <h3 class="mb-0 fw-bold text-success">{{ adminDoneCount() }}</h3>
+            <small class="text-muted">Resolved</small>
+          </div>
+        </div>
+      </div>
+    </div>
+  }
 
   <div class="row">
 
@@ -95,39 +166,6 @@
               </div>
             </div>
 
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Barangay Metrics (Admin only) -->
-    <div class="col-12 mb-4" *ngIf="user()?.role === 'admin' && user()?.barangay">
-      <div class="row g-3">
-        <div class="col-6 col-md-4">
-          <div class="card border-0 shadow-sm text-center">
-            <div class="card-body">
-              <i class="fas fa-file-alt text-primary fa-2x mb-2"></i>
-              <h3 class="fw-bold mb-0">{{ totalReports() }}</h3>
-              <p class="text-muted mb-0 small">Total Reports</p>
-            </div>
-          </div>
-        </div>
-        <div class="col-6 col-md-4">
-          <div class="card border-0 shadow-sm text-center">
-            <div class="card-body">
-              <i class="fas fa-clock text-warning fa-2x mb-2"></i>
-              <h3 class="fw-bold mb-0">{{ pendingReports() }}</h3>
-              <p class="text-muted mb-0 small">Pending</p>
-            </div>
-          </div>
-        </div>
-        <div class="col-12 col-md-4">
-          <div class="card border-0 shadow-sm text-center">
-            <div class="card-body">
-              <i class="fas fa-check-circle text-success fa-2x mb-2"></i>
-              <h3 class="fw-bold mb-0">{{ resolvedReports() }}</h3>
-              <p class="text-muted mb-0 small">Resolved</p>
-            </div>
           </div>
         </div>
       </div>
@@ -199,146 +237,161 @@
 
       <!-- Firestore Reports -->
       <ng-container *ngIf="filteredReports().length > 0; else noReports">
-        <div *ngFor="let report of filteredReports()" class="card border-0 shadow-sm mb-4">
-          <div class="card-body">
-
-            <div class="d-flex align-items-center mb-3">
-              <img *ngIf="report.reporterProfilePic; else reporterAvatar"
-                   [src]="report.reporterProfilePic"
-                   alt="Reporter"
-                   class="rounded-circle me-2"
-                   style="width: 40px; height: 40px; object-fit: cover; border: 2px solid #198754;">
-              <ng-template #reporterAvatar>
-                <div class="rounded-circle bg-success text-white d-flex align-items-center justify-content-center me-2"
-                     style="width: 40px; height: 40px; font-size: 1rem;">
-                  {{ getInitials(report.reporterName) }}
-                </div>
-              </ng-template>
-              <div class="flex-grow-1">
-                <h6 class="mb-0 fw-semibold">{{ report.reporterName }}</h6>
-                <small class="text-muted">{{ report.location }} • {{ formatTimestamp(report.createdAt) ? (formatTimestamp(report.createdAt) | date:'short') : 'just now' }}</small>
-              </div>
-              <span class="badge bg-danger">{{ report.type | titlecase }}</span>
-            </div>
-
-            <!-- Image Gallery -->
-            <div *ngIf="report.images && report.images.length" class="mb-3">
-              <div class="row g-2">
-                <div *ngFor="let img of report.images; let i = index" [class]="report.images.length === 1 ? 'col-12' : 'col-6'">
-                  <img [src]="img"
-                       class="img-fluid rounded"
-                       [alt]="report.type + ' report image ' + (i + 1)"
-                       style="cursor: pointer; width: 100%; object-fit: cover; max-height: 300px;"
-                       (click)="openImageModal(img)"
-                       title="Click to view full size">
-                </div>
-              </div>
-            </div>
-
-            <p class="card-text">{{ report.description }}</p>
-
-            <div class="mb-3">
-              <small class="text-muted">
-                <i class="fas fa-map-marker-alt me-1"></i>{{ report.location }}
-              </small>
-              <small class="text-muted ms-3">
-                <i class="fas fa-calendar me-1"></i>{{ report.date }} {{ report.time }}
-              </small>
-            </div>
-
-            <div class="d-flex align-items-center gap-3 border-top pt-3">
-              <button class="btn btn-sm btn-outline-success"
-                (click)="upvote(report)"
-                [disabled]="user()?.role === 'admin' || (report.upvotedBy || []).includes(user()?.uid || '')">
-                <i class="fas fa-arrow-up me-1"></i>{{ report.upvotes }} Upvotes
-              </button>
-              <span class="text-muted small"><i class="fas fa-comment me-1"></i>{{ (report.comments || []).length }} Comments</span>
-              <span class="badge ms-auto"
-                    [class.bg-warning]="report.status === 'Pending'"
-                    [class.bg-info]="report.status === 'In Progress'"
-                    [class.bg-success]="report.status === 'Done'"
-                    [class.text-dark]="report.status === 'Pending'">
-                <i class="fas"
-                   [class.fa-clock]="report.status === 'Pending'"
-                   [class.fa-spinner]="report.status === 'In Progress'"
-                   [class.fa-check-circle]="report.status === 'Done'"
-                   class="me-1"></i>{{ report.status }}
-              </span>
-            </div>
-
-            <!-- Map Display (if coordinates exist) -->
-            <div *ngIf="report.lat && report.lng" class="mt-3">
-              <h6 class="fw-semibold mb-2"><i class="fas fa-map-marked-alt me-2"></i>Report Location</h6>
-              <div [id]="'map-' + report.id" style="height: 300px; border-radius: 8px; border: 1px solid #dee2e6; background-color: #f8f9fa;"></div>
-              <button class="btn btn-sm btn-outline-primary mt-2"
-                      (click)="initializeMap(report.id!, report.lat!, report.lng!)">
-                <i class="fas fa-map me-1"></i>Show Map
-              </button>
-            </div>
-
-            <!-- Debug: Show if no coordinates -->
-            <div *ngIf="!report.lat || !report.lng" class="mt-3">
-              <small class="text-muted"><i class="fas fa-info-circle me-1"></i>This report was submitted before map tracking was enabled.</small>
-            </div>
-
-            <!-- Comments Section -->
-            <div *ngIf="(report.comments || []).length > 0" class="mt-3">
-              <h6 class="fw-semibold mb-3"><i class="fas fa-comments me-2"></i>Comments</h6>
-              <div *ngFor="let comment of report.comments" class="mb-3 p-3 bg-light rounded">
-                <div class="d-flex align-items-start">
-                  <img *ngIf="getUserProfilePicture(comment.userId) as commentPic; else commentAvatar"
-                       [src]="commentPic"
-                       alt="Commenter"
-                       class="rounded-circle me-2"
-                       style="width: 32px; height: 32px; object-fit: cover; border: 2px solid #0d6efd;">
-                  <ng-template #commentAvatar>
-                    <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center me-2"
-                         style="width: 32px; height: 32px; font-size: 0.8rem;">
-                      {{ getInitials(comment.userName) }}
+        @for (report of filteredReports(); track report.id) {
+          <div class="card report-card border-0 shadow-sm mb-4">
+            <!-- Green Header with Profile, Location, Pollution Type and Status -->
+            <div class="card-header report-header">
+              <div class="d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center">
+                  @if (report.reporterProfilePic) {
+                    <img [src]="report.reporterProfilePic"
+                         alt="Reporter profile picture"
+                         class="rounded-circle me-2 border border-2 border-white"
+                         style="width: 40px; height: 40px; object-fit: cover;">
+                  } @else {
+                    <div class="rounded-circle bg-white text-success d-flex align-items-center justify-content-center me-2"
+                         style="width: 40px; height: 40px; font-size: 0.9rem;">
+                      {{ getInitials(report.reporterName) }}
                     </div>
-                  </ng-template>
-                  <div class="flex-grow-1">
-                    <div class="d-flex align-items-center mb-1">
-                      <span class="fw-semibold me-2">{{ comment.userName }}</span>
-                      <span class="badge bg-primary" *ngIf="comment.userRole === 'admin'">Admin</span>
-                      <small class="text-muted ms-auto">{{ formatCommentDate(comment.createdAt) | date:'short' }}</small>
-                    </div>
-                    <p class="mb-0 small">{{ comment.text }}</p>
+                  }
+                  <div>
+                    <h6 class="mb-0 text-white fw-semibold">{{ report.reporterName }}</h6>
+                    <small class="text-white-50">
+                      <i class="fas fa-map-marker-alt me-1"></i>{{ report.location }} • {{ formatTimestamp(report.createdAt) | date:'short' }}
+                    </small>
                   </div>
                 </div>
-              </div>
-            </div>
-
-            <!-- Add Comment (Admin Only) -->
-            <div *ngIf="user()?.role === 'admin'" class="mt-3">
-              <h6 class="fw-semibold mb-2"><i class="fas fa-plus-circle me-2"></i>Add Comment</h6>
-              <div class="input-group">
-                <textarea class="form-control"
-                          rows="2"
-                          placeholder="Enter your comment..."
-                          [value]="commentTexts()[report.id!] || ''"
-                          (input)="updateCommentText(report.id!, $any($event.target).value)"
-                          [name]="'comment-' + report.id"></textarea>
-              </div>
-              <button class="btn btn-primary btn-sm mt-2"
-                      (click)="addComment(report.id!)">
-                <i class="fas fa-paper-plane me-1"></i>Submit Comment
-              </button>
-            </div>
-            <!-- Admin Response -->
-            <div *ngIf="report.adminResponse" class="mt-3 p-3 bg-light rounded">
-              <div class="d-flex align-items-start">
-                <i class="fas fa-user-shield text-primary me-2"></i>
-                <div>
-                  <h6 class="mb-1 fw-semibold text-primary">Barangay Admin Response</h6>
-                  <p class="mb-1 small">{{ report.adminResponse.text }}</p>
-                  <small class="text-muted">Responded {{ report.adminResponse.date }}</small>
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                  <span class="badge bg-danger">
+                    {{ report.type | titlecase }} Pollution
+                  </span>
+                  <span class="badge"
+                        [class.bg-warning]="report.status === 'Pending'"
+                        [class.bg-primary]="report.status === 'In Progress'"
+                        [class.bg-success]="report.status === 'Done'"
+                        [class.text-dark]="report.status === 'Pending'">
+                    <i class="fas me-1" [class.fa-clock]="report.status === 'Pending'" [class.fa-spinner]="report.status === 'In Progress'" [class.fa-check-circle]="report.status === 'Done'"></i>
+                    {{ report.status }}
+                  </span>
                 </div>
               </div>
             </div>
 
+            <div class="card-body">
+              <!-- Image Gallery - Stack Layout -->
+              @if (report.images && report.images.length) {
+                <div class="image-gallery mb-3">
+                  <div class="image-stack">
+                    @for (img of report.images; track $index) {
+                      <div class="image-stack-item" [class.single]="report.images.length === 1">
+                        <img [src]="img"
+                             class="img-fluid rounded report-image"
+                             [alt]="report.type + ' report image ' + ($index + 1)"
+                             [title]="'Click to view ' + report.type + ' report image'"
+                             (click)="openImageModal(img)">
+                      </div>
+                    }
+                  </div>
+                </div>
+              }
+
+              <p class="card-text report-description mb-3">{{ report.description }}</p>
+
+              <!-- Action Bar -->
+              <div class="d-flex align-items-center gap-3 border-top pt-3">
+                <button class="btn btn-sm btn-outline-success upvote-btn"
+                  (click)="upvote(report)"
+                  [disabled]="user()?.role === 'admin' || (report.upvotedBy || []).includes(user()?.uid || '')">
+                  <i class="fas fa-arrow-up me-1"></i>{{ report.upvotes || 0 }} Upvotes
+                </button>
+                <span class="text-muted small">
+                  <i class="fas fa-comment me-1"></i>{{ (report.comments || []).length }} Responses
+                </span>
+              </div>
+
+              <!-- Map Display -->
+              @if (report.lat && report.lng) {
+                <div class="mt-3">
+                  <h6 class="fw-semibold mb-2"><i class="fas fa-map-marked-alt me-2 text-success"></i>Report Location</h6>
+                  <div [id]="'map-' + report.id" class="report-map-container"></div>
+                  <button class="btn btn-sm btn-outline-primary mt-2"
+                          (click)="initializeMap(report.id!, report.lat!, report.lng!)">
+                    <i class="fas fa-map me-1"></i>Show Map
+                  </button>
+                </div>
+              } @else {
+                <div class="mt-3">
+                  <small class="text-muted"><i class="fas fa-info-circle me-1"></i>Location coordinates not available for this report.</small>
+                </div>
+              }
+
+              <!-- Admin Responses Section -->
+              @if ((report.comments || []).length > 0) {
+                <div class="mt-3 admin-responses px-3">
+                  <h6 class="fw-semibold mb-3"><i class="fas fa-comments me-2 text-primary"></i>Admin Responses</h6>
+                  @for (comment of report.comments; track comment.id || $index) {
+                    <div class="mb-3 p-3 bg-light rounded comment-item">
+                      <div class="d-flex align-items-start">
+                        @if (getUserProfilePicture(comment.userId); as commentPic) {
+                          <img [src]="commentPic"
+                               alt="Commenter profile"
+                               class="rounded-circle me-2 comment-avatar">
+                        } @else {
+                          <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center me-2 comment-avatar-placeholder">
+                            {{ getInitials(comment.userName) }}
+                          </div>
+                        }
+                        <div class="flex-grow-1">
+                          <div class="d-flex align-items-center mb-1">
+                            <span class="fw-semibold me-2">{{ comment.userName }}</span>
+                            @if (comment.userRole === 'admin') {
+                              <span class="badge bg-primary">Admin</span>
+                            }
+                            <small class="text-muted ms-auto">{{ formatCommentDate(comment.createdAt) | date:'short' }}</small>
+                          </div>
+                          <p class="mb-0 small">{{ comment.text }}</p>
+                        </div>
+                      </div>
+                    </div>
+                  }
+                </div>
+              }
+
+              <!-- Add Admin Response (Admin Only) -->
+              @if (user()?.role === 'admin') {
+                <div class="mt-3 px-3 add-comment-section">
+                  <h6 class="fw-semibold mb-2"><i class="fas fa-plus-circle me-2 text-success"></i>Add Admin Response</h6>
+                  <div class="input-group">
+                    <textarea class="form-control"
+                              rows="2"
+                              placeholder="Enter your response..."
+                              [value]="commentTexts()[report.id!] || ''"
+                              (input)="updateCommentText(report.id!, $any($event.target).value)"
+                              [attr.name]="'response-' + report.id"></textarea>
+                  </div>
+                  <button class="btn btn-primary btn-sm mt-2"
+                          (click)="addComment(report.id!)">
+                    <i class="fas fa-paper-plane me-1"></i>Submit Response
+                  </button>
+                </div>
+              }
+
+              <!-- Admin Response (Legacy) -->
+              @if (report.adminResponse; as adminResponse) {
+                <div class="mt-3 p-3 bg-light rounded mx-3">
+                  <div class="d-flex align-items-start">
+                    <i class="fas fa-user-shield text-primary me-2"></i>
+                    <div>
+                      <h6 class="mb-1 fw-semibold text-primary">Barangay Admin Response</h6>
+                      <p class="mb-1 small">{{ adminResponse.text }}</p>
+                      <small class="text-muted">Responded {{ adminResponse.date }}</small>
+                    </div>
+                  </div>
+                </div>
+              }
+            </div>
           </div>
-        </div>
+        }
       </ng-container>
 
       <ng-template #noReports>
@@ -356,39 +409,48 @@
 </button>
 
 <!-- Image Modal -->
-<div *ngIf="selectedImage()" class="modal d-block" style="background-color: rgba(0,0,0,0.9);" (click)="closeImageModal()">
-  <div class="modal-dialog modal-dialog-centered modal-xl">
-    <div class="modal-content bg-transparent border-0">
-      <div class="modal-body text-center p-0">
-        <button type="button" class="btn-close btn-close-white position-absolute top-0 end-0 m-3"
-                (click)="closeImageModal()"
-                style="z-index: 1050;"></button>
-        <img [src]="selectedImage()" class="img-fluid" alt="Full size image" style="max-height: 90vh;">
+@if (selectedImage()) {
+  <div class="modal d-block image-modal-backdrop" (click)="closeImageModal()">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+      <div class="modal-content bg-transparent border-0">
+        <div class="modal-body text-center p-0">
+          <button type="button" class="btn-close btn-close-white position-absolute top-0 end-0 m-3 modal-close-btn"
+                  (click)="closeImageModal()"
+                  title="Close image"
+                  aria-label="Close image modal"></button>
+          <img [src]="selectedImage()" class="img-fluid modal-image" alt="Full size report image">
+        </div>
       </div>
     </div>
   </div>
-</div>
+}
 
 <!-- Mobile Bottom Navigation (visible only on mobile) -->
 <nav class="mobile-bottom-nav d-md-none">
-  <a routerLink="/home" class="mobile-nav-item" routerLinkActive="active">
+  <a routerLink="/" class="mobile-nav-item" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}">
     <i class="fas fa-home"></i>
     <span>Home</span>
   </a>
-  <a routerLink="/submit-report" class="mobile-nav-item">
-    <i class="fas fa-plus-circle"></i>
-    <span>Report</span>
-  </a>
   @if ((user$ | async)?.role !== 'admin') {
-    <a routerLink="/help" class="mobile-nav-item" routerLinkActive="active">
-      <i class="fas fa-question-circle"></i>
-      <span>Help</span>
+    <a routerLink="/submit-report" class="mobile-nav-item" routerLinkActive="active">
+      <i class="fas fa-plus-circle"></i>
+      <span>Report</span>
     </a>
   }
+  <a routerLink="/notifications" class="mobile-nav-item position-relative" routerLinkActive="active">
+    <i class="fas fa-bell"></i>
+    <span>Alerts</span>
+    @if (unreadNotificationCount() > 0) {
+      <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger mobile-badge">{{ unreadNotificationCount() > 9 ? '9+' : unreadNotificationCount() }}</span>
+    }
+  </a>
   @if ((user$ | async)?.role === 'admin') {
-    <a routerLink="/admin" class="mobile-nav-item" routerLinkActive="active">
+    <a routerLink="/admin" class="mobile-nav-item position-relative" routerLinkActive="active">
       <i class="fas fa-shield-alt"></i>
       <span>Admin</span>
+      @if (adminPendingApprovalCount() > 0) {
+        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger mobile-badge">{{ adminPendingApprovalCount() > 9 ? '9+' : adminPendingApprovalCount() }}</span>
+      }
     </a>
   }
   <a routerLink="/profile" class="mobile-nav-item" routerLinkActive="active">

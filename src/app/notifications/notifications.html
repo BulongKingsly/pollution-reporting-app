@@ -1,0 +1,220 @@
+<!-- Navigation -->
+<nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm sticky-top">
+  <div class="container-fluid">
+    <a class="navbar-brand fw-bold text-success" routerLink="/">
+      <i class="fas fa-leaf me-2"></i>Pollution Report
+    </a>
+
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" title="Toggle navigation menu" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <ul class="navbar-nav ms-auto align-items-center">
+        <li class="nav-item"><a class="nav-link" routerLink="/"><i class="fas fa-home me-1"></i> Home</a></li>
+        @if (currentUser?.role !== 'admin') {
+          <li class="nav-item"><a class="nav-link" routerLink="/help"><i class="fas fa-question-circle me-1"></i> Help</a></li>
+        }
+        <li class="nav-item"><a class="nav-link" routerLink="/settings"><i class="fas fa-cog me-1"></i> Settings</a></li>
+        @if (currentUser?.role === 'admin') {
+          <li class="nav-item">
+            <a class="nav-link d-flex align-items-center" routerLink="/admin">
+              <i class="fas fa-shield-alt me-1"></i> Admin
+              @if (adminPendingApprovalCount > 0) {
+                <span class="badge bg-danger ms-1 notification-badge">{{ adminPendingApprovalCount > 99 ? '99+' : adminPendingApprovalCount }}</span>
+              }
+            </a>
+          </li>
+        }
+        @if (currentUser?.role !== 'admin') {
+          <li class="nav-item ms-lg-3">
+            <a class="btn btn-success" routerLink="/submit-report"><i class="fas fa-plus me-1"></i> New Report</a>
+          </li>
+        }
+        @if (currentUser) {
+          <li class="nav-item dropdown ms-lg-2">
+            <a class="nav-link dropdown-toggle d-flex align-items-center position-relative" data-bs-toggle="dropdown" aria-label="User menu">
+              @if (currentUser.profilePictureUrl) {
+                <img [src]="currentUser.profilePictureUrl" alt="Profile" class="rounded-circle" style="width: 32px; height: 32px; object-fit: cover; border: 2px solid #198754;">
+              } @else {
+                <div class="rounded-circle bg-success text-white d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; font-size: 0.9rem;">
+                  {{ (currentUser.username || currentUser.fullName || currentUser.email || 'U').charAt(0).toUpperCase() }}
+                </div>
+              }
+              @if (unreadCount > 0) {
+                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger profile-notification-badge">
+                  {{ unreadCount > 9 ? '9+' : unreadCount }}
+                </span>
+              }
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li><a class="dropdown-item" routerLink="/profile"><i class="fas fa-user me-2"></i>My Profile</a></li>
+              <li>
+                <a class="dropdown-item d-flex justify-content-between align-items-center" routerLink="/notifications">
+                  <span><i class="fas fa-bell me-2"></i>Notifications</span>
+                  @if (unreadCount > 0) {
+                    <span class="badge bg-danger rounded-pill">{{ unreadCount > 99 ? '99+' : unreadCount }}</span>
+                  }
+                </a>
+              </li>
+              <li><a class="dropdown-item" routerLink="/settings"><i class="fas fa-cog me-2"></i>Settings</a></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><a class="dropdown-item text-danger" (click)="logout()"><i class="fas fa-sign-out-alt me-2"></i>Logout</a></li>
+            </ul>
+          </li>
+        }
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<div class="container mt-4">
+  <div class="row justify-content-center">
+    <div class="col-lg-8">
+      <!-- Header -->
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+          <h2 class="mb-1"><i class="fas fa-bell me-2 text-primary"></i>Notifications</h2>
+          <p class="text-muted mb-0">
+            @if (unreadCount > 0) {
+              You have <strong>{{ unreadCount }}</strong> unread notification{{ unreadCount > 1 ? 's' : '' }}
+            } @else {
+              All caught up!
+            }
+          </p>
+        </div>
+        <div class="d-flex gap-2">
+          @if (unreadCount > 0) {
+            <button class="btn btn-outline-primary btn-sm" (click)="markAllAsRead()">
+              <i class="fas fa-check-double me-1"></i>Mark all read
+            </button>
+          }
+          @if (notifications.length > 0) {
+            <button class="btn btn-outline-danger btn-sm" (click)="deleteAllNotifications()">
+              <i class="fas fa-trash me-1"></i>Clear all
+            </button>
+          }
+        </div>
+      </div>
+
+      <!-- Filter Tabs -->
+      <ul class="nav nav-tabs mb-3">
+        <li class="nav-item">
+          <a class="nav-link" [class.active]="filter === 'all'" (click)="setFilter('all')" style="cursor: pointer;">
+            All <span class="badge bg-secondary ms-1">{{ notifications.length }}</span>
+          </a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" [class.active]="filter === 'unread'" (click)="setFilter('unread')" style="cursor: pointer;">
+            Unread <span class="badge bg-primary ms-1">{{ unreadCount }}</span>
+          </a>
+        </li>
+      </ul>
+
+      <!-- Loading State -->
+      @if (isLoading) {
+        <div class="text-center py-5">
+          <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+          <p class="mt-2 text-muted">Loading notifications...</p>
+        </div>
+      } @else if (filteredNotifications.length === 0) {
+        <!-- Empty State -->
+        <div class="text-center py-5">
+          <i class="fas fa-bell-slash fa-4x text-muted mb-3"></i>
+          <h5 class="text-muted">No notifications</h5>
+          <p class="text-muted">
+            @if (filter === 'unread') {
+              You've read all your notifications!
+            } @else {
+              You don't have any notifications yet.
+            }
+          </p>
+        </div>
+      } @else {
+        <!-- Notifications List -->
+        <div class="list-group">
+          @for (notification of filteredNotifications; track notification.id) {
+            <div
+              class="list-group-item list-group-item-action d-flex align-items-start gap-3"
+              [class.bg-light]="!notification.read"
+              (click)="navigateToNotification(notification)"
+              style="cursor: pointer;">
+
+              <!-- Icon -->
+              <div class="notification-icon rounded-circle d-flex align-items-center justify-content-center"
+                   [class.bg-primary-subtle]="!notification.read"
+                   [class.bg-light]="notification.read"
+                   style="width: 45px; height: 45px; min-width: 45px;">
+                <i [class]="getIcon(notification.type)" style="font-size: 1.1rem;"></i>
+              </div>
+
+              <!-- Content -->
+              <div class="flex-grow-1">
+                <div class="d-flex justify-content-between align-items-start">
+                  <h6 class="mb-1" [class.fw-bold]="!notification.read">{{ notification.title }}</h6>
+                  <small class="text-muted ms-2">{{ formatTime(notification.createdAt) }}</small>
+                </div>
+                <p class="mb-1 text-muted small">{{ notification.message }}</p>
+                @if (notification.fromUserName) {
+                  <small class="text-muted"><i class="fas fa-user me-1"></i>{{ notification.fromUserName }}</small>
+                }
+              </div>
+
+              <!-- Actions -->
+              <div class="d-flex flex-column gap-1">
+                @if (!notification.read) {
+                  <span class="badge bg-primary rounded-pill">New</span>
+                }
+                <button
+                  class="btn btn-sm btn-outline-danger border-0"
+                  (click)="deleteNotification(notification, $event)"
+                  title="Delete notification">
+                  <i class="fas fa-times"></i>
+                </button>
+              </div>
+            </div>
+          }
+        </div>
+      }
+    </div>
+  </div>
+</div>
+
+<!-- Mobile Bottom Navigation (visible only on mobile) -->
+<nav class="mobile-bottom-nav d-md-none">
+  <a routerLink="/" class="mobile-nav-item" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}">
+    <i class="fas fa-home"></i>
+    <span>Home</span>
+  </a>
+  @if ((user$ | async)?.role !== 'admin') {
+    <a routerLink="/submit-report" class="mobile-nav-item" routerLinkActive="active">
+      <i class="fas fa-plus-circle"></i>
+      <span>Report</span>
+    </a>
+  }
+  <a routerLink="/notifications" class="mobile-nav-item active position-relative">
+    <i class="fas fa-bell"></i>
+    <span>Alerts</span>
+    @if (unreadCount > 0) {
+      <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger mobile-badge">{{ unreadCount > 9 ? '9+' : unreadCount }}</span>
+    }
+  </a>
+  @if ((user$ | async)?.role === 'admin') {
+    <a routerLink="/admin" class="mobile-nav-item position-relative" routerLinkActive="active">
+      <i class="fas fa-shield-alt"></i>
+      <span>Admin</span>
+      @if (adminPendingApprovalCount > 0) {
+        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger mobile-badge">{{ adminPendingApprovalCount > 9 ? '9+' : adminPendingApprovalCount }}</span>
+      }
+    </a>
+  }
+  <a routerLink="/profile" class="mobile-nav-item" routerLinkActive="active">
+    <i class="fas fa-user"></i>
+    <span>Account</span>
+  </a>
+</nav>
+
+<!-- Notification Modal -->
+<app-notification-modal></app-notification-modal>

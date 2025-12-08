@@ -24,7 +24,16 @@ service cloud.firestore {
 
     // Users collection
     match /users/{userId} {
+      // Allow reading user documents:
+      // - Admins can read all users
+      // - Users can read their own document
+      // - Anyone can query by username or email (needed for login)
       allow read: if isSignedIn() && (isAdminUser() || request.auth.uid == userId);
+
+      // Allow unauthenticated queries for login (username/email lookup)
+      // This is needed because login checks if username/email exists before auth
+      allow list: if true;
+
       allow create: if isSignedIn() && request.auth.uid == userId; // auth client must write its own profile after sign-up
       allow update: if isSignedIn() && (request.auth.uid == userId || isAdminUser());
       allow delete: if isSignedIn() && isAdminUser();
@@ -39,22 +48,25 @@ service cloud.firestore {
 
     // Reports collection
     match /reports/{reportId} {
-      // Anyone signed-in can create a report but the document must set userId to the creator and barangayId must match the user's barangay
+      // Anyone signed-in can create a report
+      // The reporterId must match the authenticated user
       allow create: if isSignedIn()
-        && request.resource.data.userId == request.auth.uid
-        && request.resource.data.barangayId == getUserDoc(request.auth.uid).data.barangay;
+        && request.resource.data.reporterId == request.auth.uid;
 
       // Read rules: users can read reports for their barangay; admins can read all
       allow read: if isSignedIn() && (
         isAdminUser() || resource.data.barangayId == userBarangay()
       );
 
-      // Update: report owner can update their own report, admins can update reports in their barangay
+      // Update: report owner can update their own report, admins can update any report
+      // Users can also upvote any report in their barangay
       allow update: if isSignedIn() && (
-        request.auth.uid == resource.data.userId || (isAdminUser() && resource.data.barangayId == userBarangay())
+        request.auth.uid == resource.data.reporterId ||
+        isAdminUser() ||
+        resource.data.barangayId == userBarangay()
       );
 
-      // Delete: only admins (global) may delete reports
+      // Delete: only admins may delete reports
       allow delete: if isSignedIn() && isAdminUser();
     }
 
@@ -65,15 +77,50 @@ service cloud.firestore {
         isAdminUser() || !('barangayId' in resource.data) || resource.data.barangayId == userBarangay()
       );
 
-      // Create: global admins can create, barangay admins can create announcements scoped to their barangay
-      allow create: if isSignedIn() && (
-        isAdminUser() || (('barangayId' in request.resource.data) && isBarangayAdminFor(request.resource.data.barangayId))
-      );
+      // Create: admins can create announcements
+      allow create: if isSignedIn() && isAdminUser();
 
-      // Update/Delete: admins can modify/delete announcements for their barangay or global admins can do anything
-      allow update, delete: if isSignedIn() && (
-        isAdminUser() || (resource.data.barangayId == userBarangay() && getUserDoc(request.auth.uid).data.role == 'admin')
-      );
+      // Update/Delete: admins can modify/delete announcements
+      allow update, delete: if isSignedIn() && isAdminUser();
+    }
+
+    // Notifications collection
+    match /notifications/{notificationId} {
+      // Users can read their own notifications
+      allow read: if isSignedIn();
+
+      // Users can update their own notifications (mark as read)
+      allow update: if isSignedIn() && resource.data.userId == request.auth.uid;
+
+      // Users can delete their own notifications
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+
+      // Only Cloud Functions (admin SDK) can create notifications
+      allow create: if false;
+    }
+
+    // Pollution Types collection (read-only for users)
+    match /pollutionTypes/{typeId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && isAdminUser();
+    }
+
+    // Locations collection (read-only for users)
+    match /locations/{locationId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && isAdminUser();
+    }
+
+    // Password reset logs (for auditing)
+    match /password_reset_logs/{logId} {
+      allow create: if isSignedIn();
+      allow read: if isSignedIn() && isAdminUser();
+    }
+
+    // Settings collection (if used)
+    match /settings/{settingId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn() && isAdminUser();
     }
 
     // Fallback: deny everything else

@@ -1,7 +1,7 @@
 <!-- Navigation -->
 <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm sticky-top">
   <div class="container-fluid">
-    <a class="navbar-brand fw-bold text-success" routerLink="/home">
+    <a class="navbar-brand fw-bold text-success" routerLink="/">
       <i class="fas fa-leaf me-2"></i>Pollution Report
     </a>
 
@@ -11,15 +11,20 @@
 
     <div class="collapse navbar-collapse" id="navbarNav">
       <ul class="navbar-nav ms-auto align-items-center">
-        <li class="nav-item"><a class="nav-link" routerLink="/home"><i class="fas fa-home me-1"></i> Home</a></li>@if ((user$ | async)?.role !== 'admin') {<li class="nav-item"><a class="nav-link" routerLink="/help"><i class="fas fa-question-circle me-1"></i> Help</a></li>}<li class="nav-item"><a class="nav-link active" routerLink="/settings"><i class="fas fa-cog me-1"></i> Settings</a></li>
+        <li class="nav-item"><a class="nav-link" routerLink="/"><i class="fas fa-home me-1"></i> Home</a></li>@if ((user$ | async)?.role !== 'admin') {<li class="nav-item"><a class="nav-link" routerLink="/help"><i class="fas fa-question-circle me-1"></i> Help</a></li>}<li class="nav-item"><a class="nav-link active" routerLink="/settings"><i class="fas fa-cog me-1"></i> Settings</a></li>
         <li class="nav-item" *ngIf="(user$ | async)?.role === 'admin'">
-          <a class="nav-link" routerLink="/admin"><i class="fas fa-shield-alt me-1"></i> Admin</a>
+          <a class="nav-link d-flex align-items-center" routerLink="/admin">
+            <i class="fas fa-shield-alt me-1"></i> Admin
+            @if (adminPendingApprovalCount > 0) {
+              <span class="badge bg-danger ms-1 notification-badge">{{ adminPendingApprovalCount > 99 ? '99+' : adminPendingApprovalCount }}</span>
+            }
+          </a>
         </li>
-        <li class="nav-item ms-lg-3">
+        <li class="nav-item ms-lg-3" *ngIf="(user$ | async)?.role !== 'admin'">
           <a class="btn btn-success" routerLink="/submit-report"><i class="fas fa-plus me-1"></i> New Report</a>
         </li>
         <li class="nav-item dropdown ms-lg-2" *ngIf="user$ | async as user">
-          <a class="nav-link dropdown-toggle d-flex align-items-center" data-bs-toggle="dropdown" title="User menu" aria-label="User menu">
+          <a class="nav-link dropdown-toggle d-flex align-items-center position-relative" data-bs-toggle="dropdown" title="User menu" aria-label="User menu">
             <img *ngIf="user.profilePictureUrl; else userIcon"
                  [src]="user.profilePictureUrl"
                  alt="Profile"
@@ -31,9 +36,18 @@
                 {{ (user.username || user.fullName || user.email || 'U').charAt(0).toUpperCase() }}
               </div>
             </ng-template>
+            @if (unreadNotificationCount > 0) {
+              <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger profile-notification-badge">{{ unreadNotificationCount > 9 ? '9+' : unreadNotificationCount }}</span>
+            }
           </a>
           <ul class="dropdown-menu dropdown-menu-end">
             <li><a class="dropdown-item" routerLink="/profile"><i class="fas fa-user me-2"></i>My Profile</a></li>
+            <li>
+              <a class="dropdown-item d-flex justify-content-between align-items-center" routerLink="/notifications">
+                <span><i class="fas fa-bell me-2"></i>Notifications</span>
+                <span *ngIf="unreadNotificationCount > 0" class="badge bg-danger rounded-pill">{{ unreadNotificationCount > 99 ? '99+' : unreadNotificationCount }}</span>
+              </a>
+            </li>
             <li><a class="dropdown-item" routerLink="/settings"><i class="fas fa-cog me-2"></i>Settings</a></li>
             <li><hr class="dropdown-divider"></li>
             <li><a class="dropdown-item text-danger" (click)="logout()"><i class="fas fa-sign-out-alt me-2"></i>Logout</a></li>
@@ -86,70 +100,191 @@
           <h5 class="mb-0"><i class="fas fa-key me-2"></i>Change Password</h5>
         </div>
         <div class="card-body">
-          <form (ngSubmit)="changePassword()">
-            <!-- Success Alert -->
-            <div *ngIf="passwordSuccess" class="alert alert-success alert-dismissible fade show" role="alert">
+          <!-- Success Alert -->
+          @if (passwordSuccess) {
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
               <i class="fas fa-check-circle me-2"></i>{{ passwordSuccess }}
               <button type="button" class="btn-close" (click)="passwordSuccess = ''" aria-label="Close"></button>
             </div>
+          }
 
-            <!-- Error Alert -->
-            <div *ngIf="passwordError" class="alert alert-danger alert-dismissible fade show" role="alert">
+          <!-- Error Alert -->
+          @if (passwordError) {
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
               <i class="fas fa-exclamation-circle me-2"></i>{{ passwordError }}
               <button type="button" class="btn-close" (click)="passwordError = ''" aria-label="Close"></button>
             </div>
+          }
 
-            <div class="mb-3">
-              <label for="currentPassword" class="form-label fw-bold">Current Password</label>
-              <input
-                type="password"
-                class="form-control"
-                id="currentPassword"
-                [(ngModel)]="passwordForm.currentPassword"
-                name="currentPassword"
-                placeholder="Enter your current password"
-                [disabled]="isChangingPassword"
-                required>
+          <!-- Step 1: Password Form -->
+          @if (passwordChangeStep === 'form') {
+            <form (ngSubmit)="changePassword()">
+              <div class="mb-3">
+                <label for="currentPassword" class="form-label fw-bold">Current Password</label>
+                <input
+                  type="password"
+                  class="form-control"
+                  id="currentPassword"
+                  [(ngModel)]="passwordForm.currentPassword"
+                  name="currentPassword"
+                  placeholder="Enter your current password"
+                  [disabled]="isChangingPassword"
+                  required>
+              </div>
+
+              <div class="mb-3">
+                <label for="newPassword" class="form-label fw-bold">New Password</label>
+                <input
+                  type="password"
+                  class="form-control"
+                  id="newPassword"
+                  [(ngModel)]="passwordForm.newPassword"
+                  name="newPassword"
+                  placeholder="Enter new password (min 6 characters)"
+                  [disabled]="isChangingPassword"
+                  minlength="6"
+                  required>
+                <small class="text-muted">Must be at least 6 characters</small>
+              </div>
+
+              <div class="mb-3">
+                <label for="confirmPassword" class="form-label fw-bold">Confirm New Password</label>
+                <input
+                  type="password"
+                  class="form-control"
+                  id="confirmPassword"
+                  [(ngModel)]="passwordForm.confirmPassword"
+                  name="confirmPassword"
+                  placeholder="Re-enter new password"
+                  [disabled]="isChangingPassword"
+                  required>
+              </div>
+
+              <div class="d-flex gap-2">
+                <button class="btn btn-warning" type="submit" [disabled]="isChangingPassword || isSendingPasswordCode">
+                  @if (isChangingPassword || isSendingPasswordCode) {
+                    <span class="spinner-border spinner-border-sm me-2"></span>
+                    {{ isSendingPasswordCode ? 'Sending Code...' : 'Verifying...' }}
+                  } @else {
+                    <i class="fas fa-paper-plane me-2"></i>Send Verification Code
+                  }
+                </button>
+                <button class="btn btn-outline-secondary" type="button" (click)="resetPasswordForm()" [disabled]="isChangingPassword">
+                  Clear
+                </button>
+              </div>
+              <small class="text-muted d-block mt-2">
+                <i class="fas fa-info-circle me-1"></i>A verification code will be sent to your email before changing password.
+              </small>
+            </form>
+          }
+
+          <!-- Step 2: Verification Code -->
+          @if (passwordChangeStep === 'verify') {
+            <div class="alert alert-info">
+              <i class="fas fa-envelope me-2"></i>
+              A 6-digit verification code has been sent to your email. Please enter it below to confirm your password change.
             </div>
 
             <div class="mb-3">
-              <label for="newPassword" class="form-label fw-bold">New Password</label>
-              <input
-                type="password"
-                class="form-control"
-                id="newPassword"
-                [(ngModel)]="passwordForm.newPassword"
-                name="newPassword"
-                placeholder="Enter new password (min 6 characters)"
-                [disabled]="isChangingPassword"
-                minlength="6"
-                required>
-              <small class="text-muted">Must be at least 6 characters</small>
+              <label for="passwordVerificationCode" class="form-label fw-bold">Enter 6-Digit Code</label>
+              <div class="d-flex gap-2 align-items-center">
+                <input
+                  type="text"
+                  class="form-control"
+                  id="passwordVerificationCode"
+                  [(ngModel)]="passwordVerificationCode"
+                  name="passwordVerificationCode"
+                  placeholder="000000"
+                  maxlength="6"
+                  pattern="[0-9]*"
+                  inputmode="numeric"
+                  style="width: 140px; text-align: center; font-size: 1.25rem; letter-spacing: 0.3rem; font-weight: bold;">
+                <button class="btn btn-success" (click)="verifyAndChangePassword()" [disabled]="isVerifyingPasswordCode || passwordVerificationCode.length !== 6">
+                  @if (isVerifyingPasswordCode) {
+                    <span class="spinner-border spinner-border-sm me-2"></span>
+                  }
+                  Verify & Change
+                </button>
+                <button class="btn btn-outline-secondary" (click)="cancelPasswordChange()">Cancel</button>
+              </div>
+              <small class="text-muted mt-2 d-block">
+                Didn't receive the code? <a href="javascript:void(0)" (click)="sendPasswordChangeCode()">Resend</a>
+              </small>
             </div>
+          }
+        </div>
+      </div>
 
-            <div class="mb-3">
-              <label for="confirmPassword" class="form-label fw-bold">Confirm New Password</label>
-              <input
-                type="password"
-                class="form-control"
-                id="confirmPassword"
-                [(ngModel)]="passwordForm.confirmPassword"
-                name="confirmPassword"
-                placeholder="Re-enter new password"
-                [disabled]="isChangingPassword"
-                required>
+      <!-- Email Verification Card -->
+      <div class="card shadow-sm mb-4">
+        <div class="card-header bg-primary text-white">
+          <h5 class="mb-0"><i class="fas fa-envelope-circle-check me-2"></i>Email Verification</h5>
+        </div>
+        <div class="card-body">
+          @if (currentUser?.emailVerified) {
+            <div class="alert alert-success mb-0">
+              <i class="fas fa-check-circle me-2"></i>
+              <strong>Email Verified!</strong> Your email <strong>{{ currentUser?.email }}</strong> is verified. You will receive email notifications.
             </div>
+          } @else {
+            <p class="text-muted mb-3">
+              <i class="fas fa-info-circle me-2"></i>
+              Verify your email to receive notifications. We'll send a 6-digit verification code to <strong>{{ currentUser?.email }}</strong>.
+            </p>
 
-            <div class="d-flex gap-2">
-              <button class="btn btn-warning" type="submit" [disabled]="isChangingPassword">
-                <span *ngIf="isChangingPassword" class="spinner-border spinner-border-sm me-2"></span>
-                {{ isChangingPassword ? 'Updating...' : 'Update Password' }}
+            <!-- Success Alert -->
+            @if (emailVerificationSuccess) {
+              <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <i class="fas fa-check-circle me-2"></i>{{ emailVerificationSuccess }}
+                <button type="button" class="btn-close" (click)="emailVerificationSuccess = ''" aria-label="Close"></button>
+              </div>
+            }
+
+            <!-- Error Alert -->
+            @if (emailVerificationError) {
+              <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="fas fa-exclamation-circle me-2"></i>{{ emailVerificationError }}
+                <button type="button" class="btn-close" (click)="emailVerificationError = ''" aria-label="Close"></button>
+              </div>
+            }
+
+            @if (!verificationCodeSent) {
+              <button class="btn btn-primary" (click)="sendEmailVerificationCode()" [disabled]="isSendingVerificationCode">
+                @if (isSendingVerificationCode) {
+                  <span class="spinner-border spinner-border-sm me-2"></span>
+                  Sending...
+                } @else {
+                  <i class="fas fa-paper-plane me-2"></i>Send Verification Code
+                }
               </button>
-              <button class="btn btn-outline-secondary" type="button" (click)="passwordForm = {currentPassword: '', newPassword: '', confirmPassword: ''}; passwordError = ''; passwordSuccess = ''" [disabled]="isChangingPassword">
-                Clear
-              </button>
-            </div>
-          </form>
+            } @else {
+              <div class="mb-3">
+                <label for="verificationCode" class="form-label fw-bold">Enter 6-Digit Code</label>
+                <div class="d-flex gap-2 align-items-center">
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="verificationCode"
+                    [(ngModel)]="emailVerificationCode"
+                    name="verificationCode"
+                    placeholder="000000"
+                    maxlength="6"
+                    pattern="[0-9]*"
+                    inputmode="numeric"
+                    style="width: 140px; text-align: center; font-size: 1.25rem; letter-spacing: 0.3rem; font-weight: bold;">
+                  <button class="btn btn-success" (click)="verifyEmailCode()" [disabled]="isVerifyingEmail || emailVerificationCode.length !== 6">
+                    @if (isVerifyingEmail) {
+                      <span class="spinner-border spinner-border-sm me-2"></span>
+                    }
+                    Verify
+                  </button>
+                  <button class="btn btn-outline-secondary" (click)="cancelEmailVerification()">Cancel</button>
+                </div>
+                <small class="text-muted mt-2 d-block">Didn't receive the code? <a href="javascript:void(0)" (click)="sendEmailVerificationCode()">Resend</a></small>
+              </div>
+            }
+          }
         </div>
       </div>
 
@@ -159,21 +294,36 @@
           <h5 class="mb-0"><i class="fas fa-bell me-2"></i>Notifications</h5>
         </div>
         <div class="card-body">
+          @if (!currentUser?.emailVerified) {
+            <div class="alert alert-warning mb-3">
+              <i class="fas fa-exclamation-triangle me-2"></i>
+              <strong>Email not verified.</strong> Please verify your email above to receive email notifications.
+            </div>
+          }
           <form (ngSubmit)="saveSettings()">
             <div class="mb-3">
               <div class="form-check mb-2">
-                <input class="form-check-input" type="checkbox" [(ngModel)]="settings.notifications.email" name="notifyEmail" id="notifyEmail">
+                <input class="form-check-input" type="checkbox" [(ngModel)]="settings.notifications.email" name="notifyEmail" id="notifyEmail" [disabled]="!currentUser?.emailVerified">
                 <label class="form-check-label fw-bold" for="notifyEmail">
-                  Email Notifications
+                  <i class="fas fa-envelope text-primary me-1"></i> Email Notifications
                 </label>
                 <br>
                 <small class="text-muted ms-4">Receive updates via email</small>
               </div>
 
               <div class="form-check mb-2">
+                <input class="form-check-input" type="checkbox" [(ngModel)]="settings.notifications.reportStatus" name="notifyReportStatus" id="notifyReportStatus">
+                <label class="form-check-label fw-bold" for="notifyReportStatus">
+                  <i class="fas fa-clipboard-check text-warning me-1"></i> Report Status Updates
+                </label>
+                <br>
+                <small class="text-muted ms-4">Get notified when your report status changes (approved, in progress, resolved)</small>
+              </div>
+
+              <div class="form-check mb-2">
                 <input class="form-check-input" type="checkbox" [(ngModel)]="settings.notifications.announcement" name="notifyAnnouncement" id="notifyAnnouncement">
                 <label class="form-check-label fw-bold" for="notifyAnnouncement">
-                  Announcement Notifications
+                  <i class="fas fa-bullhorn text-info me-1"></i> Announcement Notifications
                 </label>
                 <br>
                 <small class="text-muted ms-4">Get notified about new announcements</small>
@@ -182,7 +332,7 @@
               <div class="form-check">
                 <input class="form-check-input" type="checkbox" [(ngModel)]="settings.notifications.upvote" name="notifyUpvote" id="notifyUpvote">
                 <label class="form-check-label fw-bold" for="notifyUpvote">
-                  Upvote Notifications
+                  <i class="fas fa-thumbs-up text-secondary me-1"></i> Upvote Notifications
                 </label>
                 <br>
                 <small class="text-muted ms-4">Get notified when your reports receive upvotes</small>
@@ -191,7 +341,9 @@
 
             <div class="d-flex gap-2">
               <button class="btn btn-info text-white" type="submit" [disabled]="isSavingSettings">
-                <span *ngIf="isSavingSettings" class="spinner-border spinner-border-sm me-2"></span>
+                @if (isSavingSettings) {
+                  <span class="spinner-border spinner-border-sm me-2"></span>
+                }
                 {{ isSavingSettings ? 'Saving...' : 'Save Notifications' }}
               </button>
             </div>
@@ -201,7 +353,7 @@
 
       <!-- Back to Home -->
       <div class="text-center mb-4">
-        <a class="btn btn-outline-secondary" routerLink="/home">
+        <a class="btn btn-outline-secondary" routerLink="/">
           <i class="fas fa-arrow-left me-2"></i>Back to Home
         </a>
       </div>
@@ -222,24 +374,30 @@
 
 <!-- Mobile Bottom Navigation (visible only on mobile) -->
 <nav class="mobile-bottom-nav d-md-none">
-  <a routerLink="/home" class="mobile-nav-item" routerLinkActive="active">
+  <a routerLink="/" class="mobile-nav-item" routerLinkActive="active" [routerLinkActiveOptions]="{exact: true}">
     <i class="fas fa-home"></i>
     <span>Home</span>
   </a>
-  <a routerLink="/submit-report" class="mobile-nav-item">
-    <i class="fas fa-plus-circle"></i>
-    <span>Report</span>
-  </a>
   @if ((user$ | async)?.role !== 'admin') {
-    <a routerLink="/help" class="mobile-nav-item" routerLinkActive="active">
-      <i class="fas fa-question-circle"></i>
-      <span>Help</span>
+    <a routerLink="/submit-report" class="mobile-nav-item" routerLinkActive="active">
+      <i class="fas fa-plus-circle"></i>
+      <span>Report</span>
     </a>
   }
+  <a routerLink="/notifications" class="mobile-nav-item position-relative" routerLinkActive="active">
+    <i class="fas fa-bell"></i>
+    <span>Alerts</span>
+    @if (unreadNotificationCount > 0) {
+      <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger mobile-badge">{{ unreadNotificationCount > 9 ? '9+' : unreadNotificationCount }}</span>
+    }
+  </a>
   @if ((user$ | async)?.role === 'admin') {
-    <a routerLink="/admin" class="mobile-nav-item" routerLinkActive="active">
+    <a routerLink="/admin" class="mobile-nav-item position-relative" routerLinkActive="active">
       <i class="fas fa-shield-alt"></i>
       <span>Admin</span>
+      @if (adminPendingApprovalCount > 0) {
+        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger mobile-badge">{{ adminPendingApprovalCount > 9 ? '9+' : adminPendingApprovalCount }}</span>
+      }
     </a>
   }
   <a routerLink="/profile" class="mobile-nav-item" routerLinkActive="active">
