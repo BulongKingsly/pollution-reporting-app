@@ -57,6 +57,9 @@ export class AdminDashboard implements OnInit, AfterViewInit, OnDestroy {
   // Profile dropdown state
   showProfileMenu = false;
 
+  // Mobile tab dropdown state
+  showMobileTabDropdown = false;
+
   announcementModel: Partial<Announcement> = {
     title: '',
     subtitle: '',
@@ -91,6 +94,10 @@ export class AdminDashboard implements OnInit, AfterViewInit, OnDestroy {
       const target = event.target as HTMLElement;
       if (!target.closest('.profile-dropdown')) {
         this.showProfileMenu = false;
+      }
+      // Close mobile tab dropdown when clicking outside
+      if (!target.closest('.mobile-tab-dropdown')) {
+        this.showMobileTabDropdown = false;
       }
     });
   }

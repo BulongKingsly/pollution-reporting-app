@@ -73,9 +73,9 @@
       </div>
 
     <!-- Mobile Tab Dropdown (visible only on small screens) -->
-    <div class="col-12 d-md-none mb-3">
-      <div class="dropdown">
-        <button class="btn btn-success w-100 dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+    <div class="col-12 d-md-none mb-2">
+      <div class="dropdown mobile-tab-dropdown">
+        <button class="btn btn-success w-100 dropdown-toggle" type="button" (click)="showMobileTabDropdown = !showMobileTabDropdown; $event.stopPropagation()" [attr.aria-expanded]="showMobileTabDropdown">
           <i class="fas fa-bars me-2"></i>
           @if (activeTab === 'reports') { Reports Management }
           @if (activeTab === 'tasks') { Submitted Reports @if (getPendingApprovalCount() > 0) { <span class="badge bg-danger ms-1">{{ getPendingApprovalCount() }}</span> } }
@@ -84,28 +84,28 @@
           @if (activeTab === 'barangays') { Barangays }
           @if (activeTab === 'analytics') { Analytics }
         </button>
-        <ul class="dropdown-menu w-100">
-          <li><a class="dropdown-item" href="#" (click)="$event.preventDefault(); setTab('reports')" [class.active]="activeTab==='reports'">
+        <ul class="dropdown-menu w-100" [class.show]="showMobileTabDropdown">
+          <li><a class="dropdown-item" href="#" (click)="$event.preventDefault(); setTab('reports'); showMobileTabDropdown = false" [class.active]="activeTab==='reports'">
             <i class="fas fa-file-alt me-2"></i>Reports Management
           </a></li>
-          <li><a class="dropdown-item" href="#" (click)="$event.preventDefault(); setTab('tasks')" [class.active]="activeTab==='tasks'">
+          <li><a class="dropdown-item" href="#" (click)="$event.preventDefault(); setTab('tasks'); showMobileTabDropdown = false" [class.active]="activeTab==='tasks'">
             <i class="fas fa-clipboard-list me-2"></i>Submitted Reports
             <span *ngIf="getPendingApprovalCount() > 0" class="badge bg-danger ms-2">{{ getPendingApprovalCount() }}</span>
           </a></li>
-          <li><a class="dropdown-item" href="#" (click)="$event.preventDefault(); setTab('announcements')" [class.active]="activeTab==='announcements'">
+          <li><a class="dropdown-item" href="#" (click)="$event.preventDefault(); setTab('announcements'); showMobileTabDropdown = false" [class.active]="activeTab==='announcements'">
             <i class="fas fa-bullhorn me-2"></i>Announcements
           </a></li>
-          <li><a class="dropdown-item" href="#" (click)="$event.preventDefault(); setTab('users')" [class.active]="activeTab==='users'">
+          <li><a class="dropdown-item" href="#" (click)="$event.preventDefault(); setTab('users'); showMobileTabDropdown = false" [class.active]="activeTab==='users'">
             <i class="fas fa-users me-2"></i>Users Control
           </a></li>
-          <li><a class="dropdown-item" href="#" (click)="$event.preventDefault(); setTab('barangays')" [class.active]="activeTab==='barangays'">
+          <li><a class="dropdown-item" href="#" (click)="$event.preventDefault(); setTab('barangays'); showMobileTabDropdown = false" [class.active]="activeTab==='barangays'">
             <i class="fas fa-city me-2"></i>Barangays
           </a></li>
-          <li><a class="dropdown-item" href="#" (click)="$event.preventDefault(); setTab('analytics')" [class.active]="activeTab==='analytics'">
+          <li><a class="dropdown-item" href="#" (click)="$event.preventDefault(); setTab('analytics'); showMobileTabDropdown = false" [class.active]="activeTab==='analytics'">
             <i class="fas fa-chart-bar me-2"></i>Analytics
           </a></li>
           <li><hr class="dropdown-divider"></li>
-          <li><a class="dropdown-item text-success" href="#" (click)="$event.preventDefault(); goHome()">
+          <li><a class="dropdown-item text-success" href="#" (click)="$event.preventDefault(); goHome(); showMobileTabDropdown = false">
             <i class="fas fa-home me-2"></i>Go to Home
           </a></li>
         </ul>
@@ -158,11 +158,10 @@
 
     <!-- Main Content -->
     <main class="col-12 col-md-9 ms-sm-auto col-lg-10 px-3 px-md-4">
-      <br>
 
       <!-- Reports -->
       <section [hidden]="activeTab !== 'reports'">
-        <h2 class="fw-bold mb-3">Reports Management</h2>
+        <h2 class="fw-bold mb-3 mt-2 mt-md-4">Reports Management</h2>
 
         <!-- Barangay Filter Dropdown (Main Admin Only) -->
         @if (isMainAdmin) {
@@ -186,7 +185,6 @@
                       </button>
                     </div>
                     <div *ngIf="showReportsDropdown && getFilteredBarangays(reportsSearchText).length > 0" class="dropdown-menu show w-100 barangay-filter-dropdown">
-                      <div class="dropdown-menu-scroll">
                         <button type="button" class="dropdown-item" [class.active]="!selectedBarangayFilter" (mousedown)="clearReportsBarangayFilter()">
                           <i class="fas fa-globe me-2"></i>All Barangays
                         </button>
@@ -195,7 +193,6 @@
                             {{ b.name }}
                           </button>
                         }
-                      </div>
                     </div>
                     <div *ngIf="showReportsDropdown && getFilteredBarangays(reportsSearchText).length === 0 && reportsSearchText" class="dropdown-menu show w-100">
                       <span class="dropdown-item text-muted">No barangays found</span>
@@ -489,7 +486,6 @@
                       </button>
                     </div>
                     <div *ngIf="showTasksDropdown && getFilteredBarangays(tasksSearchText).length > 0" class="dropdown-menu show w-100 barangay-filter-dropdown">
-                      <div class="dropdown-menu-scroll">
                         <button type="button" class="dropdown-item" [class.active]="!selectedTasksBarangayFilter" (mousedown)="clearTasksBarangayFilter()">
                           <i class="fas fa-globe me-2"></i>All Barangays
                         </button>
@@ -498,7 +494,6 @@
                             {{ b.name }}
                           </button>
                         }
-                      </div>
                     </div>
                     <div *ngIf="showTasksDropdown && getFilteredBarangays(tasksSearchText).length === 0 && tasksSearchText" class="dropdown-menu show w-100">
                       <span class="dropdown-item text-muted">No barangays found</span>
@@ -613,7 +608,6 @@
                     </button>
                   </div>
                   <div *ngIf="showAnnouncementTargetDropdown && getFilteredBarangays(announcementTargetSearchText).length > 0" class="dropdown-menu show w-100 barangay-filter-dropdown">
-                    <div class="dropdown-menu-scroll">
                       <button type="button" class="dropdown-item" [class.active]="!announcementModel.barangayId" (mousedown)="clearAnnouncementTargetBarangay()">
                         <i class="fas fa-globe me-2"></i>All Barangays (Global)
                       </button>
@@ -622,7 +616,6 @@
                           {{ b.name }}
                         </button>
                       }
-                    </div>
                   </div>
                   <div *ngIf="showAnnouncementTargetDropdown && getFilteredBarangays(announcementTargetSearchText).length === 0 && announcementTargetSearchText" class="dropdown-menu show w-100">
                     <span class="dropdown-item text-muted">No barangays found</span>
@@ -674,7 +667,6 @@
                       </button>
                     </div>
                     <div *ngIf="showAnnouncementsDropdown && getFilteredBarangays(announcementsSearchText).length > 0" class="dropdown-menu show w-100 barangay-filter-dropdown">
-                      <div class="dropdown-menu-scroll">
                         <button type="button" class="dropdown-item" [class.active]="!selectedAnnouncementsBarangayFilter" (mousedown)="clearAnnouncementsBarangayFilter()">
                           <i class="fas fa-globe me-2"></i>All Barangays
                         </button>
@@ -683,7 +675,6 @@
                             {{ b.name }}
                           </button>
                         }
-                      </div>
                     </div>
                     <div *ngIf="showAnnouncementsDropdown && getFilteredBarangays(announcementsSearchText).length === 0 && announcementsSearchText" class="dropdown-menu show w-100">
                       <span class="dropdown-item text-muted">No barangays found</span>
@@ -891,7 +882,6 @@
                       </button>
                     </div>
                     <div *ngIf="showUsersDropdown && getFilteredBarangays(usersSearchText).length > 0" class="dropdown-menu show w-100 barangay-filter-dropdown">
-                      <div class="dropdown-menu-scroll">
                         <button type="button" class="dropdown-item" [class.active]="!selectedUsersBarangayFilter" (mousedown)="clearUsersBarangayFilter()">
                           <i class="fas fa-globe me-2"></i>All Barangays
                         </button>
@@ -900,7 +890,6 @@
                             {{ b.name }}
                           </button>
                         }
-                      </div>
                     </div>
                     <div *ngIf="showUsersDropdown && getFilteredBarangays(usersSearchText).length === 0 && usersSearchText" class="dropdown-menu show w-100">
                       <span class="dropdown-item text-muted">No barangays found</span>
@@ -1041,7 +1030,6 @@
                       </button>
                     </div>
                     <div *ngIf="showAnalyticsDropdown && getFilteredBarangays(analyticsSearchText).length > 0" class="dropdown-menu show w-100 barangay-filter-dropdown">
-                      <div class="dropdown-menu-scroll">
                         <button type="button" class="dropdown-item" [class.active]="!selectedAnalyticsBarangayFilter" (mousedown)="clearAnalyticsBarangayFilter()">
                           <i class="fas fa-globe me-2"></i>All Barangays
                         </button>
@@ -1050,7 +1038,6 @@
                             {{ b.name }}
                           </button>
                         }
-                      </div>
                     </div>
                     <div *ngIf="showAnalyticsDropdown && getFilteredBarangays(analyticsSearchText).length === 0 && analyticsSearchText" class="dropdown-menu show w-100">
                       <span class="dropdown-item text-muted">No barangays found</span>
