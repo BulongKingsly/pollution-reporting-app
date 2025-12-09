@@ -177,7 +177,7 @@
       <!-- Announcements Carousel from Firestore -->
       <ng-container *ngIf="announcements$ | async as announcements">
         <div *ngIf="announcements.length > 0" class="mb-4">
-          <div id="announcementsCarousel" class="carousel slide" data-bs-ride="carousel">
+          <div id="announcementsCarousel" class="carousel slide" data-bs-ride="carousel" data-bs-touch="true">
             <!-- Carousel Indicators -->
             <div class="carousel-indicators" *ngIf="announcements.length > 1">
               <button *ngFor="let announcement of announcements; let i = index"

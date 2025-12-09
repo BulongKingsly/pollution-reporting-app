@@ -180,7 +180,8 @@
             <select class="form-select form-select-sm"
                     title="Update report status"
                     [value]="report().status"
-                    (change)="onStatusChange($any($event.target).value)">
+                    (change)="onStatusChange($any($event.target).value)"
+                    [attr.disabled]="report().status === 'Done' ? true : null">
               <option value="Pending">Pending</option>
               <option value="In Progress">In Progress</option>
               <option value="Done">Done</option>

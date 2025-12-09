@@ -312,6 +312,14 @@ export class Home implements AfterViewInit, OnDestroy {
   ngAfterViewInit() {
     // Fix Leaflet marker icon paths
     this.fixLeafletIcons();
+
+    // Re-initialize Bootstrap carousel for touch/swipe support
+    setTimeout(() => {
+      const carouselEl = document.getElementById('announcementsCarousel');
+      if (carouselEl && (window as any).bootstrap) {
+        (window as any).bootstrap.Carousel.getOrCreateInstance(carouselEl, { touch: true });
+      }
+    }, 500);
   }
 
   private fixLeafletIcons(): void {

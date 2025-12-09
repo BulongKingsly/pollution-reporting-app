@@ -300,7 +300,7 @@
 
                     <div class="mb-3">
                       <label class="form-label fw-medium">Update Status</label>
-                      <select class="form-select" title="Update status" [value]="r.status" (change)="updateStatus(r, $any($event.target).value)">
+                      <select class="form-select" title="Update status" [value]="r.status" (change)="updateStatus(r, $any($event.target).value)" [attr.disabled]="r.status === 'Done' ? true : null">
                         <option [value]="'In Progress'" [selected]="r.status === 'In Progress'">In Progress</option>
                         <option [value]="'Done'" [selected]="r.status === 'Done'">Done</option>
                       </select>
